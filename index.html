@@ -437,7 +437,7 @@
     <div class="sheet-body" id="dayBody"><p class="note">読み込み中…</p></div>
     <div class="day-btnrow">
       <button type="button" class="btn btn-main" data-close="dayModal">← 週間予報に戻る</button>
-      <button type="button" class="day-closebtn" data-close="dayModal">閉じる</button>
+      <button type="button" class="day-closebtn" id="dayCloseAllBtn">閉じる</button>
     </div>
   </div>
 </div>
@@ -1778,6 +1778,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     $('locAddr').addEventListener('keydown', (e) => { if (e.key === 'Enter') addLocation(); });
     $('geoBtn').addEventListener('click', useCurrentLocation);
     applyTheme(document.body.classList.contains('dark'));
+    $('dayCloseAllBtn').addEventListener('click', () => { closeModal('dayModal'); closeModal('weekModal'); });
     $('themeToggleBtn').addEventListener('click', () => {
       const dark = !document.body.classList.contains('dark');
       try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch (e) {}
