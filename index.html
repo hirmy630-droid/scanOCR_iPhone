@@ -1647,8 +1647,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   function openRadar() {
     const loc = selectedLoc();
     if (!loc) return;
-    $('radarFrame').src = `https://site.weathernews.jp/onebox/map/livecam_radar/index.html?lat=${loc.lat}&lon=${loc.lon}`;
-    openModal('radarModal');
+    window.open(`https://weather.yahoo.co.jp/weather/zoomradar/?lat=${loc.lat}&lon=${loc.lon}&z=10`, '_blank');
   }
 
   // 1時間毎ポップアップ
