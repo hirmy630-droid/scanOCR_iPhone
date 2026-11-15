@@ -190,7 +190,8 @@
   .day-block .db-temp { font-size: 15px; color: #6b7280; }
   .day-block .db-wind { font-size: 14px; color: #6b7280; margin-top: 2px; }
   .day-btnrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; flex: 0 0 auto; }
-  .day-btnrow .btn-main { width: auto; }
+  .day-btnrow .btn-main { width: auto; white-space: nowrap; }
+  .day-btnrow .day-closebtn { white-space: nowrap; }
   .day-closebtn { height: 40px; background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0) 48%, rgba(0,60,140,0.06)), linear-gradient(180deg, #f4f9ff, #dbeafe 55%, #c3d9fb); border: 1px solid #9db8dd; color: #007aff; border-radius: 12px; padding: 0 20px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 5px rgba(0,60,140,0.18), inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -2px 0 rgba(0,60,140,0.10); transition: transform .08s ease, box-shadow .08s ease; }
   .day-closebtn:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(0,60,140,0.18), inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(0,60,140,0.10); }
   .note { font-size: 14px; color: #8e8e93; line-height: 1.55; }
@@ -438,7 +439,7 @@
     <div class="sheet-head"><h3 id="dayTitle">💧 降水予報</h3><span class="day-date" id="dayDate"></span><button type="button" class="sheet-close" data-close="dayModal">✕</button></div>
     <div class="sheet-body" id="dayBody"><p class="note">読み込み中…</p></div>
     <div class="day-btnrow">
-      <button type="button" class="btn btn-main" data-close="dayModal">← 週間予報に戻る</button>
+      <button type="button" class="btn btn-main" data-close="dayModal">← 週間予報</button>
       <button type="button" class="day-closebtn" id="dayCloseAllBtn">閉じる</button>
     </div>
   </div>
