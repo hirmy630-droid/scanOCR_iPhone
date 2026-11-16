@@ -111,8 +111,8 @@
   .now-strip .nw-k { font-weight: 700; color: #fff; }
   .now-strip .nw-e { font-size: 25px; line-height: 1; }
   .now-strip .nw-v { font-weight: 600; }
-  .now-strip #nowTemp { font-size: 20px; font-weight: 700; }
-  .now-strip .nw-feels { color: #ff9f0a; font-size: 20px; font-weight: 700; }
+  .now-strip #nowTemp { font-size: 20px; font-weight: 700; align-self: baseline; }
+  .now-strip .nw-feels { color: #ff9f0a; font-size: 18px; font-weight: 700; align-self: baseline; }
   .feels-strip .fk { font-weight: 700; color: #92400e; flex: 0 0 auto; }
   .feels-strip .fv { flex: 1; display: flex; justify-content: space-around; font-weight: 700; }
   .feels-strip .fv span b { color: #ff6a3a; }
@@ -147,6 +147,7 @@
   table.mini th, table.mini td { padding: 4px; text-align: center; border-bottom: 1px solid #eeeef2; }
   table.mini th { color: #6b7280; font-weight: 600; position: sticky; top: 0; background: #fff; z-index: 1; }
   table.mini td { font-size: 16px; }
+  table.mini td.day-sep { background: rgba(120,120,128,.14); font-weight: 700; text-align: left; padding-left: 8px; }
   #rainModal table.mini th, #windModal table.mini th { font-size: 18px; }
   #rainModal table.mini td, #windModal table.mini td { font-size: 19px; }
   #rainModal table.mini td.rn { font-size: 21px; }
@@ -347,6 +348,12 @@
 
   <div id="alertBanner" class="alert-banner hidden"></div>
 
+  <!-- つぎの雨予報 -->
+  <section class="card">
+    <h2>🌧️ つぎの雨予報</h2>
+    <div class="nextrain" id="nextRain"><p class="note">予報を取得すると表示します。</p></div>
+  </section>
+
   <!-- 明日の服装 -->
   <section class="card">
     <h2 class="of-title" id="clothesTitle">👕 明日の服装</h2>
@@ -357,12 +364,6 @@
       <div><div class="fr-k">20時の体感</div><div class="fr-v" id="feel20">--℃</div></div>
     </div>
     <div class="advice ok" id="umbrellaAdvice">傘の目安を計算中…</div>
-  </section>
-
-  <!-- つぎの雨予報 -->
-  <section class="card">
-    <h2>🌧️ つぎの雨予報</h2>
-    <div class="nextrain" id="nextRain"><p class="note">予報を取得すると表示します。</p></div>
   </section>
 
 </div>
@@ -1687,8 +1688,15 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     if (!e || !lastData) return;
     const dayDate = dateOfEntry(e);
     let rows = (lastData.hourly || []).filter(r => sameDay(r.date, dayDate));
-    // 今日表示のときは、過ぎた時間を非表示にする
-    if (offset === 0) { const nh = jstNow().getUTCHours(); rows = rows.filter(r => r.time >= nh); }
+    // 今日は「今の時間から24時間」を表示する（日付をまたぐ場合は明日の行も含む）
+    if (offset === 0) {
+      const nh = jstNow().getUTCHours();
+      const startMs = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), nh).getTime();
+      rows = (lastData.hourly || []).filter(r => {
+        const ms = new Date(r.date.getFullYear(), r.date.getMonth(), r.date.getDate(), r.time).getTime();
+        return ms >= startMs && ms < startMs + 24 * 3600000;
+      }).sort((a, b) => (a.date - b.date) || (a.time - b.time));
+    }
     const d = dateFromMrfTm(e.mrf.tm);
     const dayName = `${d.mo}月${d.d}日（${d.dow}）・${DAY_LABEL[currentDay]}`;
     $('hourlyTitle').innerHTML = `🕐 1時間毎の予報<span class="h-sub2">${dayName}</span>`;
@@ -1698,7 +1706,10 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       return;
     }
     let html = '<table class="mini"><tr><th>時</th><th>天気</th><th>気温</th><th>体感</th><th>風速</th><th>雨量</th></tr>';
+    let prevDay = null;
     rows.forEach(r => {
+      if (prevDay && !sameDay(r.date, prevDay)) { const dl = `${r.date.getMonth() + 1}月${r.date.getDate()}日（${'日月火水木金土'[r.date.getDay()]}）`; html += `<tr><td colspan="6" class="day-sep">明日 ${dl}</td></tr>`; }
+      prevDay = r.date;
       const fl = r.temp != null ? feelsLike(r.temp, r.windSpd, r.wx, r.time, sunRange(e.mrf), r.hum) : null;
       const rv = r.rainMm;
       const pop = lastData.popMap ? lastData.popMap[omKey(r.date, r.time)] : null;
@@ -1719,8 +1730,15 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     if (!e || !lastData) return;
     const dayDate = dateOfEntry(e);
     let rows = (lastData.hourly || []).filter(r => sameDay(r.date, dayDate));
-    // 今日表示のときは、過ぎた時間を非表示にする
-    if (offset === 0) { const nh = jstNow().getUTCHours(); rows = rows.filter(r => r.time >= nh); }
+    // 今日は「今の時間から24時間」を表示する（日付をまたぐ場合は明日の行も含む）
+    if (offset === 0) {
+      const nh = jstNow().getUTCHours();
+      const startMs = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), nh).getTime();
+      rows = (lastData.hourly || []).filter(r => {
+        const ms = new Date(r.date.getFullYear(), r.date.getMonth(), r.date.getDate(), r.time).getTime();
+        return ms >= startMs && ms < startMs + 24 * 3600000;
+      }).sort((a, b) => (a.date - b.date) || (a.time - b.time));
+    }
     const d = dateFromMrfTm(e.mrf.tm);
     $('rainTitle').innerHTML = `💧 降水の詳細<span class="h-sub2">${d.mo}月${d.d}日（${d.dow}）・${DAY_LABEL[currentDay]}</span>`;
     if (!rows.length) {
@@ -1731,7 +1749,10 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     let html = '<table class="mini"><tr><th>時</th><th>降水量</th><th>降水確率</th></tr>';
     const popMap = lastData.popMap || {};
     const precipMap = lastData.precipMap || {};
+    let prevDay = null;
     rows.forEach(r => {
+      if (prevDay && !sameDay(r.date, prevDay)) { const dl = `${r.date.getMonth() + 1}月${r.date.getDate()}日（${'日月火水木金土'[r.date.getDay()]}）`; html += `<tr><td colspan="3" class="day-sep">明日 ${dl}</td></tr>`; }
+      prevDay = r.date;
       const pop = popMap[omKey(r.date, r.time)];
       const prc = precipMap[omKey(r.date, r.time)];
       const rv = r.rainMm != null ? r.rainMm : 0;
@@ -1749,8 +1770,15 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     if (!e || !lastData) return;
     const dayDate = dateOfEntry(e);
     let rows = (lastData.hourly || []).filter(r => sameDay(r.date, dayDate));
-    // 今日表示のときは、過ぎた時間を非表示にする
-    if (offset === 0) { const nh = jstNow().getUTCHours(); rows = rows.filter(r => r.time >= nh); }
+    // 今日は「今の時間から24時間」を表示する（日付をまたぐ場合は明日の行も含む）
+    if (offset === 0) {
+      const nh = jstNow().getUTCHours();
+      const startMs = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), nh).getTime();
+      rows = (lastData.hourly || []).filter(r => {
+        const ms = new Date(r.date.getFullYear(), r.date.getMonth(), r.date.getDate(), r.time).getTime();
+        return ms >= startMs && ms < startMs + 24 * 3600000;
+      }).sort((a, b) => (a.date - b.date) || (a.time - b.time));
+    }
     const d = dateFromMrfTm(e.mrf.tm);
     $('windTitle').innerHTML = `🍃 風の詳細<span class="h-sub2">${d.mo}月${d.d}日（${d.dow}）・${DAY_LABEL[currentDay]}</span>`;
     if (!rows.length) {
@@ -1759,7 +1787,10 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       return;
     }
     let html = '<table class="mini"><tr><th>時</th><th>風速</th><th>風向き</th></tr>';
+    let prevDay = null;
     rows.forEach(r => {
+      if (prevDay && !sameDay(r.date, prevDay)) { const dl = `${r.date.getMonth() + 1}月${r.date.getDate()}日（${'日月火水木金土'[r.date.getDay()]}）`; html += `<tr><td colspan="3" class="day-sep">明日 ${dl}</td></tr>`; }
+      prevDay = r.date;
       const dir = windDirLabel(r.windDir);
       const dirLbl = dir != null ? dir : '―';
       const dirCell = r.windImg && r.windSpd > 0 ? `<span>${dirLbl}</span><img class="wicon-t" src="https://gvs.weathernews.jp/onebox/img/wind/png/${r.windImg}" alt="" onload="var p=this.previousElementSibling;if(p)p.style.display='none'" onerror="this.remove()">` : dirLbl;
