@@ -1,4 +1,4 @@
-const VERSION = "20261123-scan-06";
+const VERSION = "20261123-scan-08";
 const CORE = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {

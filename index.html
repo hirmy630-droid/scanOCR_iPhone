@@ -216,7 +216,7 @@
 
 <div class="app-header">
   <h1>📄 スキャンOCR</h1>
-  <button class="icon-btn" id="btnFavOpen" aria-label="お気に入り設定">⭐</button>
+  <button class="icon-btn" id="btnFavOpen" aria-label="設定">⚙</button>
   <button class="icon-btn" id="btnHelpOpen" aria-label="使い方">❓</button>
 </div>
 
@@ -308,8 +308,7 @@
   <div class="card">
     <h2>保存したスキャン <span class="muted" id="libCount"></span></h2>
     <div id="libList"></div>
-    <p class="muted" id="libEmpty">まだ保存がありません。下の「スキャン」で撮って、編集画面で「保存」を押すとここに残ります。</p>
-    <p class="muted" style="margin:6px 0 0;">保存先はiPhone内です。空き容量が極端に少ないとiOSが消すことがあります。大事なものはPDFや画像でも残してください。</p>
+    <p class="muted" id="libEmpty">まだ保存がありません</p>
   </div>
 </div>
 
@@ -320,7 +319,7 @@
 
 <div id="favModal" class="modal-overlay hidden">
   <div class="modal-card">
-    <h2>⭐ お気に入り設定 <span class="sp"></span><button class="small" id="btnFavClose">閉じる</button></h2>
+    <h2>⚙ お気に入り設定 <span class="sp"></span><button class="small" id="btnFavClose">閉じる</button></h2>
     <div id="favList" style="margin-top:6px;"></div>
     <h2 style="margin-top:14px;">お気に入りを追加</h2>
     <input type="text" id="favName" placeholder="名前（例：PDFでGoodNotes）">
@@ -365,7 +364,7 @@
       2. 撮影が終わると編集画面になります。ページを選んで青い丸を書類の四隅に合わせると台形補正されます。「強調」にすると文字が読みやすくなります。<br>
       3. 「保存」を押すと一覧に残ります。あとから直すときは、一覧でファイルをタップすると編集画面になります。<br>
       4. 「全ページOCR」でテキスト化できます。印刷文字向けです。手書きや読みにくい書類は「Museに送る」が確実です。<br>
-      5. ⭐（タイトル右）でお気に入りと設定が開きます。保存した直後にデフォルトのお気に入りを自動で動かす設定もあります。<br>
+      5. ⚙（タイトル右）でお気に入りと設定が開きます。保存した直後にデフォルトのお気に入りを自動で動かす設定もあります。<br>
       ※カメラが開かない環境では、通常のカメラ（写真の確認画面）に切り替わります。画面の色は iPhone のライト／ダーク設定に自動で合います。
     </p>
   </div>
@@ -522,6 +521,18 @@ function guideRectFor(ow, oh) {
   if (gh > oh * 0.60) { gh = oh * 0.60; gw = gh * 0.7071; }
   return { x: (ow - gw) / 2, y: (oh - gh) / 2 - oh * 0.03, w: gw, h: gh };
 }
+/* ガイド枠 (画面ピクセル) を、映像全体に対する隅の割合 [左上,右上,右下,左下] に変換する */
+function guideCornersFrac(guide, ow, oh, vw, vh) {
+  const crop = videoCropRect(vw, vh, ow, oh);
+  const fx = px => (crop.x + (px / ow) * crop.w) / vw;
+  const fy = py => (crop.y + (py / oh) * crop.h) / vh;
+  return [
+    { x: fx(guide.x), y: fy(guide.y) },
+    { x: fx(guide.x + guide.w), y: fy(guide.y) },
+    { x: fx(guide.x + guide.w), y: fy(guide.y + guide.h) },
+    { x: fx(guide.x), y: fy(guide.y + guide.h) }
+  ];
+}
 /* サンプル画像 (グレースケール配列) から、枠内の明るさ・枠外の明るさ・枠内のエッジ割合を出す */
 function analyzeSample(gray, w, h, rect) {
   const x0 = Math.max(0, Math.floor(rect.x)), y0 = Math.max(0, Math.floor(rect.y));
@@ -598,12 +609,13 @@ async function decodeImage(blob) {
   return { src: c, w: dims.w, h: dims.h };
 }
 
-/* 1枚取り込んでページに追加する (編集画面は開かない) */
-async function importBlob(blob) {
+/* 1枚取り込んでページに追加する (編集画面は開かない)。corners を渡すとその隅で切り抜く */
+async function importBlob(blob, corners) {
   const d = await decodeImage(blob);
   const page = {
     id: ++pageSeq, img: d.src, w: d.w, h: d.h, rotation: 0,
-    corners: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }],
+    corners: corners ? corners.map(p => ({ x: p.x, y: p.y }))
+      : [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }],
     filter: "enhance", ocr: ""
   };
   pages.push(page);
@@ -857,6 +869,7 @@ let camFailed = false;      // アプリ内カメラが使えなかったら、�
 let camTimer = null;
 let camPrevGray = null;
 let camStableCount = 0;
+let camPresentCount = 0;
 let camBusy = false;
 let camSessionPages = 0;
 let camGuide = null;        // ガイド枠 (画面ピクセル)
@@ -871,7 +884,7 @@ $("btnCamClose").addEventListener("click", closeCamera);
 $("btnShutter").addEventListener("click", () => captureFromCamera());
 $("btnAutoToggle").addEventListener("click", () => {
   camAuto = !camAuto;
-  camStableCount = 0; camPrevGray = null;
+  camStableCount = 0; camPresentCount = 0; camPrevGray = null;
   const b = $("btnAutoToggle");
   b.textContent = camAuto ? "自動撮影：ON" : "自動撮影：OFF";
   b.classList.toggle("on", camAuto);
@@ -903,7 +916,7 @@ async function openCamera(silent) {
   }
   camStream = stream;
   camSessionPages = 0;
-  camPrevGray = null; camStableCount = 0; camBusy = false;
+  camPrevGray = null; camStableCount = 0; camPresentCount = 0; camBusy = false;
   $("camVideo").srcObject = stream;
   $("cameraOverlay").classList.remove("hidden");
   document.body.style.overflow = "hidden";
@@ -986,13 +999,17 @@ function autoTick() {
   const diff = meanAbsDiff(gray, camPrevGray);
   camPrevGray = gray;
   const present = (stats.insideMean - stats.outsideMean > 6) || stats.edgeRatio > 0.022;
-  const stable = diff < 5.0;
+  const stable = diff < 9.0;
+  if (present) camPresentCount++; else camPresentCount = 0;
   if (present && stable) camStableCount++; else camStableCount = 0;
   if (!present) setCamStatus("書類を枠に合わせてください");
   else if (!stable) setCamStatus("そのまま動かさないでください…");
   else setCamStatus("撮影します…");
-  if (camStableCount >= 4) {
+  /* 静止が続いたら撮影。手持ちの微妙な動きで静止判定にならなくても、
+     書類が映り続けていれば (3秒) 大きく動いていない限り撮影する */
+  if (camStableCount >= 3 || (camPresentCount >= 15 && diff < 16)) {
     camStableCount = 0;
+    camPresentCount = 0;
     captureFromCamera();
   }
 }
@@ -1011,7 +1028,12 @@ async function captureFromCamera() {
     c.getContext("2d").drawImage(v, 0, 0, dims.w, dims.h);
     const blob = await canvasBlob(c, "image/jpeg", 0.92);
     if (!blob) throw new Error("撮影に失敗しました");
-    await importBlob(blob);
+    /* ガイド枠に合わせて自動で切り抜く (隅の初期値をガイド枠にする) */
+    let corners = null;
+    if (camGuide) {
+      corners = guideCornersFrac(camGuide, window.innerWidth, window.innerHeight, v.videoWidth, v.videoHeight);
+    }
+    await importBlob(blob, corners);
     editDirty = true;
     camSessionPages++;
     updateCamCount();
@@ -1022,6 +1044,7 @@ async function captureFromCamera() {
     camBusy = false;
     camPrevGray = null;
     camStableCount = 0;
+    camPresentCount = 0;
   }
 }
 
@@ -1087,21 +1110,23 @@ $("btnClearText").addEventListener("click", () => { $("ocrText").value = ""; });
 function canvasBlob(canvas, type, q) {
   return new Promise(res => canvas.toBlob(res, type, q));
 }
-async function buildImageFiles() {
+async function buildImageFiles(srcPages) {
+  const src = srcPages || pages;
   const name = "scan_" + stamp();
   const files = [];
-  for (let i = 0; i < pages.length; i++) {
-    const blob = await canvasBlob(renderPage(pages[i]), "image/jpeg", 0.88);
+  for (let i = 0; i < src.length; i++) {
+    const blob = await canvasBlob(renderPage(src[i]), "image/jpeg", 0.88);
     files.push(new File([blob], name + "_" + (i + 1) + ".jpg", { type: "image/jpeg" }));
   }
   return files;
 }
-async function buildPdfFile() {
+async function buildPdfFile(srcPages) {
+  const src = srcPages || pages;
   if (typeof window.jspdf === "undefined") throw new Error("PDFの読み込みに失敗しました（通信環境を確認してください）");
   const { jsPDF } = window.jspdf;
   let doc = null;
-  for (let i = 0; i < pages.length; i++) {
-    const canvas = renderPage(pages[i]);
+  for (let i = 0; i < src.length; i++) {
+    const canvas = renderPage(src[i]);
     const wMm = 210, hMm = 210 * canvas.height / canvas.width;
     if (!doc) doc = new jsPDF({ unit: "mm", format: [wMm, hMm], orientation: hMm >= wMm ? "portrait" : "landscape" });
     else doc.addPage([wMm, hMm], hMm >= wMm ? "portrait" : "landscape");
@@ -1175,7 +1200,7 @@ $("btnDriveUpload").addEventListener("click", () => doAction("drive-upload"));
 async function uploadToDrive(blob, name, mimeType) {
   const url = (settings.driveUrl || "").trim();
   const key = (settings.driveKey || "").trim();
-  if (!url || !key) throw new Error("⭐の設定でアップロードURLと合言葉を入れてください");
+  if (!url || !key) throw new Error("⚙の設定でアップロードURLと合言葉を入れてください");
   const dataUrl = await new Promise((res, rej) => {
     const r = new FileReader();
     r.onload = () => res(r.result);
@@ -1205,7 +1230,7 @@ function renderFavorites() {
     const b = document.createElement("button");
     b.className = "primary big";
     b.style.width = "100%";
-    b.textContent = "⭐ " + def.name + "（デフォルト）";
+    b.textContent = def.name + "（デフォルト）";
     b.addEventListener("click", () => doAction(def.action));
     btnWrap.appendChild(b);
   }
@@ -1219,7 +1244,7 @@ function renderFavorites() {
     row.appendChild(b);
   });
   if (favorites.length) btnWrap.appendChild(row);
-  else btnWrap.innerHTML = '<p class="muted">お気に入りはまだありません。右上の⭐から追加できます。</p>';
+  else btnWrap.innerHTML = '<p class="muted">お気に入りはまだありません。右上の⚙から追加できます。</p>';
 
   const list = $("favList");
   list.innerHTML = "";
@@ -1381,6 +1406,11 @@ function formatDateTime(ts) {
   return d.getFullYear() + "/" + p(d.getMonth() + 1) + "/" + p(d.getDate()) +
     " " + p(d.getHours()) + ":" + p(d.getMinutes());
 }
+function formatDate(ts) {
+  const d = new Date(ts);
+  const p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "/" + p(d.getMonth() + 1) + "/" + p(d.getDate());
+}
 $("btnSaveScan").addEventListener("click", async () => {
   if (!pages.length) { alert("ページがありません"); return; }
   let name = editingName;
@@ -1442,10 +1472,28 @@ async function renderLibrary() {
     nm.className = "name"; nm.textContent = rec.name;
     const meta = document.createElement("div");
     meta.className = "meta";
-    meta.textContent = formatDateTime(rec.createdAt) + " ・ " + rec.pages.length + "ページ";
+    meta.textContent = formatDate(rec.createdAt) + " ・ " + rec.pages.length + "ページ";
     info.appendChild(nm); info.appendChild(meta);
     const acts = document.createElement("div");
     acts.className = "acts";
+    const shareBtn = document.createElement("button");
+    shareBtn.className = "small"; shareBtn.textContent = "共有";
+    shareBtn.addEventListener("click", async ev => {
+      ev.stopPropagation();
+      showLoading("PDFを作成中…");
+      try {
+        const loaded = [];
+        for (const sp of rec.pages) loaded.push(await storedToPage(sp));
+        const pdf = await buildPdfFile(loaded);
+        const safeName = (rec.name || "scan").replace(/[\\\/:*?"<>|]/g, "_");
+        const named = new File([pdf], safeName + ".pdf", { type: "application/pdf" });
+        await shareFiles([named]);
+      } catch (e) {
+        if (e && e.name === "AbortError") return; // 共有シートを閉じただけ
+        alert("共有できませんでした：" + (e && e.message ? e.message : e));
+      } finally { hideLoading(); }
+    });
+    acts.appendChild(shareBtn);
     const delBtn = document.createElement("button");
     delBtn.className = "small danger"; delBtn.textContent = "削除";
     delBtn.addEventListener("click", async ev => {
