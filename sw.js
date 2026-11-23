@@ -1,4 +1,4 @@
-const VERSION = "20261123-scan-08";
+const VERSION = "20261123-scan-14";
 const CORE = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -7,7 +7,7 @@ self.addEventListener("install", e => {
 self.addEventListener("activate", e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== VERSION && k !== "scanocr-font-v1").map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });

@@ -62,8 +62,13 @@
   }
   .page-thumb.active img { border-color: var(--accent); }
   .page-thumb .cap { font-size: 14px; color: var(--sub); margin-top: 1px; }
-  #editorWrap { position: relative; width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
-  #editorImg { width: 100%; display: block; border-radius: 8px; }
+  #editorWrap { position: relative; width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  #editorImg { width: 100%; display: block; border-radius: 8px; -webkit-user-drag: none; }
+  #loupe {
+    position: absolute; width: 132px; height: 132px; border-radius: 50%;
+    border: 2px solid var(--accent); box-shadow: 0 2px 12px rgba(0,0,0,.35);
+    z-index: 6; pointer-events: none; background: #888;
+  }
   #editorSvg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   .handle {
     position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px;
@@ -94,14 +99,9 @@
   #progressWrap { display: none; }
   progress { width: 100%; height: 14px; }
   .hidden { display: none !important; }
-  details.card summary { font-weight: 600; cursor: pointer; list-style: none; }
-  details.card summary::-webkit-details-marker { display: none; }
   .seg { display: flex; gap: 6px; }
   .seg button { flex: 1; }
 
-  /* タブ */
-  .tabs { display: flex; gap: 5px; margin: 2px 0 2px; }
-  .tabs button { flex: 1; }
   /* 保存ライブラリ */
   .lib-item {
     display: flex; gap: 8px; align-items: center; padding: 6px 0;
@@ -252,6 +252,7 @@
     <div class="handle" data-corner="1"></div>
     <div class="handle" data-corner="2"></div>
     <div class="handle" data-corner="3"></div>
+    <canvas id="loupe" class="hidden" width="264" height="264"></canvas>
   </div>
   <p class="muted" style="margin:6px 0;">青い丸を書類の四隅に合わせてください。</p>
   <div class="seg" id="filterSeg" style="margin:8px 0;">
@@ -363,7 +364,7 @@
       1. 下の「スキャン」で撮影します。白い枠に書類全体を合わせてください。「自動撮影」をオンにすると、書類を検出して手が止まったら自動で撮ります。手動は下の白い丸ボタンです。続けて撮ると複数ページになります。<br>
       2. 撮影が終わると編集画面になります。ページを選んで青い丸を書類の四隅に合わせると台形補正されます。「強調」にすると文字が読みやすくなります。<br>
       3. 「保存」を押すと一覧に残ります。あとから直すときは、一覧でファイルをタップすると編集画面になります。<br>
-      4. 「全ページOCR」でテキスト化できます。印刷文字向けです。手書きや読みにくい書類は「Museに送る」が確実です。<br>
+      4. 「全ページOCR」でテキスト化できます。印刷文字向けです。手書きや読みにくい書類は「Museに送る」が確実です。PDFで共有すると、OCRした文字が透明なテキストとして入り、GoodNotesなどで文字を選択・検索できます（未OCRのときは共有時に自動で読み取ります）。<br>
       5. ⚙（タイトル右）でお気に入りと設定が開きます。保存した直後にデフォルトのお気に入りを自動で動かす設定もあります。<br>
       ※カメラが開かない環境では、通常のカメラ（写真の確認画面）に切り替わります。画面の色は iPhone のライト／ダーク設定に自動で合います。
     </p>
@@ -382,6 +383,7 @@
   <div class="cam-topbar">
     <button id="btnCamClose" class="cam-btn">✕ 閉じる</button>
     <button id="btnAutoToggle" class="cam-btn">自動撮影：OFF</button>
+    <button id="btnLens" class="cam-btn">超広角：OFF</button>
   </div>
   <div id="camHint">書類全体が枠に入るように合わせてください</div>
   <div id="camStatus"></div>
@@ -400,13 +402,15 @@
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
 <script>
 "use strict";
 
 /* ================= 状態 ================= */
 const LS_FAV = "scanocr.favorites.v1";
-const MAX_IMPORT_DIM = 2048;   // 取り込み直後にこのサイズへ縮小する（固まり対策）
-let pages = [];           // {id, img, w, h, rotation, corners:[{x,y}x4] (回転後の画像座標, 0..1), filter, ocr}
+const MAX_IMPORT_DIM = 2600;   // OCR精度を上げるため、取り込み解像度を向上（メモリ対策で上限あり）
+let pages = [];           // {id, img, w, h, rotation, corners:[{x,y}x4] (回転後の画像座標, 0..1), filter, ocr, words, ocrW, ocrH, ocrDone}
 let activePageId = null;
 let pageSeq = 0;
 let favorites = loadFavorites();
@@ -435,7 +439,7 @@ function saveFavorites() {
 
 /* ================= 設定 (ON/OFF) ================= */
 const LS_SETTINGS = "scanocr.settings.v1";
-let settings = { runDefaultOnSave: true, launchCamera: false, driveUrl: "", driveKey: "" };
+let settings = { runDefaultOnSave: true, launchCamera: false, driveUrl: "", driveKey: "", lens: "main" };
 try {
   const rawS = localStorage.getItem(LS_SETTINGS);
   if (rawS) {
@@ -444,6 +448,7 @@ try {
     if (typeof d.launchCamera === "boolean") settings.launchCamera = d.launchCamera;
     if (typeof d.driveUrl === "string") settings.driveUrl = d.driveUrl;
     if (typeof d.driveKey === "string") settings.driveKey = d.driveKey;
+    if (d.lens === "ultra" || d.lens === "main") settings.lens = d.lens;
   }
 } catch (e) { /* ignore */ }
 function saveSettings() {
@@ -496,10 +501,19 @@ function applyH(H, x, y) {
   return { x: (H[0] * x + H[1] * y + H[2]) / w, y: (H[3] * x + H[4] * y + H[5]) / w };
 }
 function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
-/* 出力サイズ: 対向する辺の長さの最大値 (上限 2400px) */
+/* 出力サイズ: 対向する辺の長さの最大値 (上限 2400px)。
+   既知の用紙比率 (A/B判 1.4142、レター 1.2941) に近ければ、その比率に合わせて形を整える */
 function warpOutputSize(cornersPx) {
-  const w = Math.max(dist(cornersPx[0], cornersPx[1]), dist(cornersPx[3], cornersPx[2]));
-  const h = Math.max(dist(cornersPx[0], cornersPx[3]), dist(cornersPx[1], cornersPx[2]));
+  let w = Math.max(dist(cornersPx[0], cornersPx[1]), dist(cornersPx[3], cornersPx[2]));
+  let h = Math.max(dist(cornersPx[0], cornersPx[3]), dist(cornersPx[1], cornersPx[2]));
+  const r = Math.max(w, h) / Math.min(w, h);
+  for (const pr of [1.4142, 1.2941]) {
+    if (Math.abs(r - pr) / pr < 0.02) {
+      const nl = Math.min(w, h) * pr;
+      if (w >= h) w = nl; else h = nl;
+      break;
+    }
+  }
   const scale = Math.min(1, 2400 / Math.max(w, h));
   return { w: Math.max(2, Math.round(w * scale)), h: Math.max(2, Math.round(h * scale)) };
 }
@@ -516,9 +530,9 @@ function videoCropRect(vw, vh, ow, oh) {
 }
 /* ガイド枠 (画面ピクセル) を計算する。A4縦の比率で、画面に収まる大きさにする */
 function guideRectFor(ow, oh) {
-  let gw = ow * 0.88;
+  let gw = ow * 0.94;
   let gh = gw / 0.7071;
-  if (gh > oh * 0.60) { gh = oh * 0.60; gw = gh * 0.7071; }
+  if (gh > oh * 0.75) { gh = oh * 0.75; gw = gh * 0.7071; }
   return { x: (ow - gw) / 2, y: (oh - gh) / 2 - oh * 0.03, w: gw, h: gh };
 }
 /* ガイド枠 (画面ピクセル) を、映像全体に対する隅の割合 [左上,右上,右下,左下] に変換する */
@@ -562,6 +576,153 @@ function meanAbsDiff(a, b) {
   let s = 0;
   for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]);
   return s / a.length;
+}
+/* グレースケール画像から書類の隅を検出する。
+   prior: 想定する隅 [左上,右上,右下,左下] (0..1 の割合)、band: prior の辺から探す範囲 (割合)。
+   prior の近くで最も強いエッジの直線を4辺ぶん探して交点を隅にする。見つからなければ null */
+function detectDocCorners(gray, w, h, prior, band) {
+  const gx = new Float32Array(w * h), gy = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const xm = Math.max(0, x - 1), xp = Math.min(w - 1, x + 1);
+      const ym = Math.max(0, y - 1), yp = Math.min(h - 1, y + 1);
+      gx[y * w + x] = Math.abs(gray[y * w + xp] - gray[y * w + xm]);
+      gy[y * w + x] = Math.abs(gray[yp * w + x] - gray[ym * w + x]);
+    }
+  }
+  /* 水平な辺 (上・下): y = a*x + b。傾きの候補をいくつか試し、
+     帯の中で縦勾配が最も強く続く直線を探す (斜めの辺でも薄まらない) */
+  const SLOPES = [0, 0.08, -0.08, 0.16, -0.16, 0.28, -0.28, 0.4, -0.4];
+  function hLine(yCenterPx, x0Px, x1Px, bandPx) {
+    if (x1Px - x0Px < 20) return null;
+    const yLo = Math.max(1, Math.floor(yCenterPx - bandPx));
+    const yHi = Math.min(h - 2, Math.ceil(yCenterPx + bandPx));
+    let bandSum = 0, bandCnt = 0;
+    for (let y = yLo; y <= yHi; y++)
+      for (let x = Math.max(0, Math.floor(x0Px)); x <= Math.min(w - 1, x1Px); x++) { bandSum += gy[y * w + x]; bandCnt++; }
+    const bandMean = bandCnt ? bandSum / bandCnt : 0;
+    const xm = (x0Px + x1Px) / 2, span = x1Px - x0Px;
+    const xa = x0Px + span * 0.05, xb = x1Px - span * 0.05;
+    let best = null;
+    for (const a of SLOPES) {
+      for (let dy = -bandPx; dy <= bandPx; dy += 2) {
+        const b = (yCenterPx + dy) - a * xm;
+        let s = 0, n = 0;
+        for (let x = xa; x <= xb; x += 2) {
+          const xi = Math.round(x), y = Math.round(a * x + b);
+          if (y < 1 || y > h - 2) continue;
+          s += Math.max(gy[y * w + xi], gy[(y - 1) * w + xi], gy[(y + 1) * w + xi]);
+          n++;
+        }
+        if (!n) continue;
+        const avg = s / n;
+        if (!best || avg > best.avg) best = { a, b, avg };
+      }
+    }
+    if (!best || best.avg < Math.max(16, bandMean * 1.8)) return null;
+    return { a: best.a, b: best.b };
+  }
+  /* 垂直な辺 (左・右): x = c*y + d。横勾配で同じように探す */
+  function vLine(xCenterPx, y0Px, y1Px, bandPx) {
+    if (y1Px - y0Px < 20) return null;
+    const xLo = Math.max(1, Math.floor(xCenterPx - bandPx));
+    const xHi = Math.min(w - 2, Math.ceil(xCenterPx + bandPx));
+    let bandSum = 0, bandCnt = 0;
+    for (let x = xLo; x <= xHi; x++)
+      for (let y = Math.max(0, Math.floor(y0Px)); y <= Math.min(h - 1, y1Px); y++) { bandSum += gx[y * w + x]; bandCnt++; }
+    const bandMean = bandCnt ? bandSum / bandCnt : 0;
+    const ym = (y0Px + y1Px) / 2, span = y1Px - y0Px;
+    const ya = y0Px + span * 0.05, yb = y1Px - span * 0.05;
+    let best = null;
+    for (const c of SLOPES) {
+      for (let dx = -bandPx; dx <= bandPx; dx += 2) {
+        const d = (xCenterPx + dx) - c * ym;
+        let s = 0, n = 0;
+        for (let y = ya; y <= yb; y += 2) {
+          const yi = Math.round(y), x = Math.round(c * y + d);
+          if (x < 1 || x > w - 2) continue;
+          s += Math.max(gx[yi * w + x], gx[yi * w + x - 1], gx[yi * w + x + 1]);
+          n++;
+        }
+        if (!n) continue;
+        const avg = s / n;
+        if (!best || avg > best.avg) best = { c, d, avg };
+      }
+    }
+    if (!best || best.avg < Math.max(16, bandMean * 1.8)) return null;
+    return { c: best.c, d: best.d };
+  }
+  const P = prior.map(p => ({ x: p.x * w, y: p.y * h }));
+  const top = hLine((P[0].y + P[1].y) / 2, P[0].x, P[1].x, band * h);
+  const bottom = hLine((P[3].y + P[2].y) / 2, P[3].x, P[2].x, band * h);
+  const left = vLine((P[0].x + P[3].x) / 2, P[0].y, P[3].y, band * w);
+  const right = vLine((P[1].x + P[2].x) / 2, P[1].y, P[2].y, band * w);
+  if (!top || !bottom || !left || !right) return null;
+  function crossH(hl, vl) {
+    const y = (hl.a * vl.d + hl.b) / (1 - hl.a * vl.c);
+    return { x: vl.c * y + vl.d, y };
+  }
+  const cs = [crossH(top, left), crossH(top, right), crossH(bottom, right), crossH(bottom, left)]
+    .map(p => ({ x: p.x / w, y: p.y / h }));
+  for (let i = 0; i < 4; i++) {
+    if (cs[i].x < -0.04 || cs[i].x > 1.04 || cs[i].y < -0.04 || cs[i].y > 1.04) return null;
+    if (Math.abs(cs[i].x - prior[i].x) > 0.30 || Math.abs(cs[i].y - prior[i].y) > 0.30) return null;
+  }
+  let sign = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = cs[i], b = cs[(i + 1) % 4], c = cs[(i + 2) % 4];
+    const cr = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+    if (Math.abs(cr) < 1e-6) return null;
+    const s = Math.sign(cr);
+    if (sign === 0) sign = s; else if (s !== sign) return null;
+  }
+  let area = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = cs[i], b = cs[(i + 1) % 4];
+    area += a.x * b.y - b.x * a.y;
+  }
+  area = Math.abs(area) / 2;
+  if (area < 0.08 || area > 0.995) return null;
+  return cs.map(p => ({ x: Math.min(1, Math.max(0, p.x)), y: Math.min(1, Math.max(0, p.y)) }));
+}
+/* Tesseract の結果から、単語とその位置 (bbox・OCRした画像のピクセル) を取り出す */
+function extractOcrWords(data) {
+  const words = [];
+  function push(wd) {
+    if (!wd || !wd.text || !wd.bbox) return;
+    const t = String(wd.text).replace(/\s+/g, "");
+    if (!t) return;
+    if (typeof wd.confidence === "number" && wd.confidence < 25) return;
+    words.push({ t, x0: wd.bbox.x0, y0: wd.bbox.y0, x1: wd.bbox.x1, y1: wd.bbox.y1 });
+  }
+  if (data && data.blocks) {
+    data.blocks.forEach(b => (b.paragraphs || []).forEach(p =>
+      (p.lines || []).forEach(l => (l.words || []).forEach(push))));
+  } else if (data && data.words) {
+    data.words.forEach(push);
+  }
+  return words;
+}
+/* OCRの単語bbox (画像ピクセル) を、PDFページ上の矩形 (pt、左上原点) に変換する */
+function wordRectPt(word, ocrW, ocrH, pageWPt, pageHPt) {
+  const kx = pageWPt / ocrW, ky = pageHPt / ocrH;
+  return {
+    x: word.x0 * kx, y: word.y0 * ky,
+    w: (word.x1 - word.x0) * kx, h: (word.y1 - word.y0) * ky
+  };
+}
+/* OCRテキストをページごとに並べるときの区切り */
+const OCR_PAGE_SEP = "\n\n----- 次のページ -----\n\n";
+/* 画像を90度回転したときに、隅 (左上・右上・右下・左下の順) を回転先の座標へ移す。
+   座標変換 (x, y) → (1 - y, x) に加えて、並び順も回転後の位置に直す */
+function rotateCorners90(corners) {
+  const cs = corners.map(p => ({ x: 1 - p.y, y: p.x }));
+  return [cs[3], cs[0], cs[1], cs[2]];
+}
+/* テキスト欄の内容をページ数ぶんに分割する。数が合わなければ null (書き戻ししない) */
+function splitOcrText(raw, count) {
+  const parts = String(raw).split(OCR_PAGE_SEP);
+  return parts.length === count ? parts.map(s => s.trim()) : null;
 }
 /*__PURE_END__*/
 
@@ -609,14 +770,37 @@ async function decodeImage(blob) {
   return { src: c, w: dims.w, h: dims.h };
 }
 
-/* 1枚取り込んでページに追加する (編集画面は開かない)。corners を渡すとその隅で切り抜く */
+/* 描画可能なソースを幅400pxのグレースケール配列にする (隅の検出用) */
+function grayFromDrawable(src, w, h) {
+  const tw = 400, th = Math.max(2, Math.round(tw * h / w));
+  const c = document.createElement("canvas");
+  c.width = tw; c.height = th;
+  const ctx = c.getContext("2d");
+  ctx.drawImage(src, 0, 0, tw, th);
+  const data = ctx.getImageData(0, 0, tw, th).data;
+  const gray = new Float32Array(tw * th);
+  for (let i = 0; i < tw * th; i++) {
+    gray[i] = data[i * 4] * 0.299 + data[i * 4 + 1] * 0.587 + data[i * 4 + 2] * 0.114;
+  }
+  return { gray, w: tw, h: th };
+}
+
+/* 1枚取り込んでページに追加する (編集画面は開かない)。corners を渡すとその隅で切り抜く。
+   corners が無いときは、写真から書類の隅を検出して自動で切り抜く (失敗したら全面) */
 async function importBlob(blob, corners) {
   const d = await decodeImage(blob);
+  if (!corners) {
+    try {
+      const g = grayFromDrawable(d.src, d.w, d.h);
+      corners = detectDocCorners(g.gray, g.w, g.h,
+        [{ x: 0.06, y: 0.06 }, { x: 0.94, y: 0.06 }, { x: 0.94, y: 0.94 }, { x: 0.06, y: 0.94 }], 0.30);
+    } catch (e) { corners = null; }
+  }
   const page = {
     id: ++pageSeq, img: d.src, w: d.w, h: d.h, rotation: 0,
     corners: corners ? corners.map(p => ({ x: p.x, y: p.y }))
       : [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }],
-    filter: "enhance", ocr: ""
+    filter: "enhance", ocr: "", words: null, ocrW: 0, ocrH: 0, ocrDone: false
   };
   pages.push(page);
   activePageId = page.id;
@@ -677,7 +861,7 @@ function applyFilter(canvas, filter) {
 }
 
 /* ページの最終画像 (回転→台形補正→フィルタ) を canvas で返す。maxDim を渡すとその範囲で軽く描く */
-function renderPage(page, maxDim) {
+function renderPage(page, maxDim, applyPageFilter = true) {
   let base = rotatedCanvas(page);
   if (maxDim && Math.max(base.width, base.height) > maxDim) {
     const dims = downscaleDims(base.width, base.height, maxDim);
@@ -707,16 +891,24 @@ function renderPage(page, maxDim) {
     for (let y = 0; y < size.h; y++) {
       for (let x = 0; x < size.w; x++) {
         const s = applyH(Hinv, x, y);
-        const sx = Math.round(s.x), sy = Math.round(s.y);
         const oi = (y * size.w + x) * 4;
-        if (sx < 0 || sy < 0 || sx >= W || sy >= H) { dd[oi + 3] = 255; continue; }
-        const si = (sy * W + sx) * 4;
-        dd[oi] = src[si]; dd[oi + 1] = src[si + 1]; dd[oi + 2] = src[si + 2]; dd[oi + 3] = 255;
+        if (s.x < -1 || s.y < -1 || s.x > W || s.y > H) { dd[oi + 3] = 255; continue; }
+        /* 双線形補間でサンプリングする (文字の輪郭がなめらかになる) */
+        const x0 = Math.min(W - 2, Math.max(0, Math.floor(s.x)));
+        const y0 = Math.min(H - 2, Math.max(0, Math.floor(s.y)));
+        const fx = Math.min(1, Math.max(0, s.x - x0)), fy = Math.min(1, Math.max(0, s.y - y0));
+        const i00 = (y0 * W + x0) * 4, i10 = i00 + 4, i01 = i00 + W * 4, i11 = i01 + 4;
+        for (let ch = 0; ch < 3; ch++) {
+          const top = src[i00 + ch] * (1 - fx) + src[i10 + ch] * fx;
+          const bot = src[i01 + ch] * (1 - fx) + src[i11 + ch] * fx;
+          dd[oi + ch] = top * (1 - fy) + bot * fy;
+        }
+        dd[oi + 3] = 255;
       }
     }
     octx.putImageData(dstIm, 0, 0);
   }
-  applyFilter(out, page.filter);
+  if (applyPageFilter) applyFilter(out, page.filter);
   return out;
 }
 
@@ -813,11 +1005,47 @@ function drawGuide() {
   svg.innerHTML = '<polygon points="' + pts + '" fill="rgba(0,122,255,.12)" stroke="#007aff" stroke-width="2"/>';
 }
 let dragCorner = null;
+/* 調整中の拡大ルーペ: ドラッグしている隅のまわりを拡大して指の上に表示する */
+function showLoupe() {
+  if (!editorPage || dragCorner === null) return;
+  const img = $("editorImg"), loupe = $("loupe");
+  if (!img.naturalWidth) return;
+  const p = editorPage.corners[dragCorner];
+  const r = img.getBoundingClientRect(), wr = $("editorWrap").getBoundingClientRect();
+  const Z = 2.75, size = 132, S = loupe.width;
+  const srcW = (size / Z) * (img.naturalWidth / r.width);
+  const srcH = (size / Z) * (img.naturalHeight / r.height);
+  const cx = p.x * img.naturalWidth, cy = p.y * img.naturalHeight;
+  const ctx = loupe.getContext("2d");
+  ctx.clearRect(0, 0, S, S);
+  ctx.save();
+  ctx.beginPath(); ctx.arc(S / 2, S / 2, S / 2, 0, Math.PI * 2); ctx.clip();
+  ctx.drawImage(img, cx - srcW / 2, cy - srcH / 2, srcW, srcH, 0, 0, S, S);
+  ctx.strokeStyle = "rgba(0,122,255,.9)"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(S / 2, 10); ctx.lineTo(S / 2, S - 10);
+  ctx.moveTo(10, S / 2); ctx.lineTo(S - 10, S / 2);
+  ctx.stroke();
+  ctx.beginPath(); ctx.arc(S / 2, S / 2, 11, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+  const hx = (r.left - wr.left) + p.x * r.width;
+  const hy = (r.top - wr.top) + p.y * r.height;
+  let lx = hx - size / 2, ly = hy - size - 26;
+  if (ly < 0) ly = hy + 26;
+  lx = Math.max(0, Math.min(wr.width - size, lx));
+  ly = Math.max(0, Math.min(wr.height - size, ly));
+  loupe.style.left = lx + "px"; loupe.style.top = ly + "px";
+  loupe.classList.remove("hidden");
+}
+function hideLoupe() { $("loupe").classList.add("hidden"); }
+/* 長押しで共有などのメニューが出ないようにする */
+$("editorWrap").addEventListener("contextmenu", e => e.preventDefault());
 document.querySelectorAll(".handle").forEach(h => {
   h.addEventListener("pointerdown", e => {
     dragCorner = Number(h.dataset.corner);
     h.setPointerCapture(e.pointerId);
     e.preventDefault();
+    showLoupe();
   });
   h.addEventListener("pointermove", e => {
     if (dragCorner === null || Number(h.dataset.corner) !== dragCorner || !editorPage) return;
@@ -826,9 +1054,10 @@ document.querySelectorAll(".handle").forEach(h => {
     const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
     editorPage.corners[dragCorner] = { x, y };
     positionHandles();
+    showLoupe();
   });
-  h.addEventListener("pointerup", () => { if (dragCorner !== null) editDirty = true; dragCorner = null; renderPageList(); });
-  h.addEventListener("pointercancel", () => { dragCorner = null; });
+  h.addEventListener("pointerup", () => { if (dragCorner !== null) editDirty = true; dragCorner = null; hideLoupe(); renderPageList(); });
+  h.addEventListener("pointercancel", () => { dragCorner = null; hideLoupe(); });
 });
 window.addEventListener("resize", () => {
   positionHandles();
@@ -838,7 +1067,7 @@ $("btnRotate").addEventListener("click", () => {
   if (!editorPage) return;
   editDirty = true;
   editorPage.rotation = (editorPage.rotation + 90) % 360;
-  editorPage.corners = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }];
+  editorPage.corners = rotateCorners90(editorPage.corners);
   openEditor(editorPage.id); renderPageList();
 });
 $("btnResetCorners").addEventListener("click", () => {
@@ -870,6 +1099,8 @@ let camTimer = null;
 let camPrevGray = null;
 let camStableCount = 0;
 let camPresentCount = 0;
+let camAutoArmed = true;   // 撮影したら一旦止め、書類の入れ替え (動き・消失) で再開する
+let camLens = settings.lens === "ultra" ? "ultra" : "main";   // "main" | "ultra" (超広角)
 let camBusy = false;
 let camSessionPages = 0;
 let camGuide = null;        // ガイド枠 (画面ピクセル)
@@ -884,11 +1115,64 @@ $("btnCamClose").addEventListener("click", closeCamera);
 $("btnShutter").addEventListener("click", () => captureFromCamera());
 $("btnAutoToggle").addEventListener("click", () => {
   camAuto = !camAuto;
-  camStableCount = 0; camPresentCount = 0; camPrevGray = null;
+  camStableCount = 0; camPresentCount = 0; camPrevGray = null; camAutoArmed = true;
   const b = $("btnAutoToggle");
   b.textContent = camAuto ? "自動撮影：ON" : "自動撮影：OFF";
   b.classList.toggle("on", camAuto);
   setCamStatus(camAuto ? "書類を枠に合わせてください" : "");
+});
+
+/* カメラのストリームを取得する。超広角が選ばれていれば背面の超広角カメラを使う
+   (近距離でも A4 が収まる)。見つからなければ通常の背面カメラに落ちる */
+async function getCamStream() {
+  const base = { width: { ideal: 2560 }, height: { ideal: 1920 } };   // センサー本来の4:3 (正方形だと左右が切れる)
+  async function ultraStream() {
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    const ultra = devs.find(d => d.kind === "videoinput" &&
+      (d.label.indexOf("超広角") >= 0 || d.label.toLowerCase().indexOf("ultra wide") >= 0));
+    if (!ultra) return null;
+    return navigator.mediaDevices.getUserMedia({
+      video: Object.assign({ deviceId: { exact: ultra.deviceId } }, base), audio: false
+    });
+  }
+  if (camLens === "ultra") {
+    try { const u = await ultraStream(); if (u) return u; } catch (e) { /* 通常に落とす */ }
+    /* 初回はラベルが見えず超広角を特定できないことがある。通常で許可を取ってから再挑戦する */
+    const m = await navigator.mediaDevices.getUserMedia({
+      video: Object.assign({ facingMode: "environment" }, base), audio: false
+    });
+    try {
+      const u2 = await ultraStream();
+      if (u2) { m.getTracks().forEach(t => t.stop()); return u2; }
+    } catch (e) { /* 通常のまま */ }
+    return m;
+  }
+  return navigator.mediaDevices.getUserMedia({
+    video: Object.assign({ facingMode: "environment" }, base), audio: false
+  });
+}
+function updateLensBtn() {
+  const b = $("btnLens");
+  b.textContent = camLens === "ultra" ? "超広角：ON" : "超広角：OFF";
+  b.classList.toggle("on", camLens === "ultra");
+}
+$("btnLens").addEventListener("click", async () => {
+  camLens = camLens === "ultra" ? "main" : "ultra";
+  settings.lens = camLens;
+  saveSettings();
+  updateLensBtn();
+  if (!camStream) return;
+  try {
+    const stream = await getCamStream();
+    camStream.getTracks().forEach(t => t.stop());
+    camStream = stream;
+    $("camVideo").srcObject = stream;
+    try { await $("camVideo").play(); } catch (e) { /* ignore */ }
+    camPrevGray = null; camStableCount = 0; camPresentCount = 0; camAutoArmed = true;
+    showToast(camLens === "ultra" ? "超広角に切り替えました" : "通常カメラに切り替えました");
+  } catch (e) {
+    alert("カメラを切り替えられませんでした");
+  }
 });
 
 async function openCamera(silent) {
@@ -902,10 +1186,7 @@ async function openCamera(silent) {
   }
   let stream = null;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1920 } },
-      audio: false
-    });
+    stream = await getCamStream();
   } catch (e) {
     if (!silent) {
       camFailed = true;
@@ -916,10 +1197,11 @@ async function openCamera(silent) {
   }
   camStream = stream;
   camSessionPages = 0;
-  camPrevGray = null; camStableCount = 0; camPresentCount = 0; camBusy = false;
+  camPrevGray = null; camStableCount = 0; camPresentCount = 0; camBusy = false; camAutoArmed = true;
   $("camVideo").srcObject = stream;
   $("cameraOverlay").classList.remove("hidden");
   document.body.style.overflow = "hidden";
+  updateLensBtn();
   layoutGuide();
   updateCamCount();
   try { await $("camVideo").play(); } catch (e) { /* ignore */ }
@@ -999,6 +1281,12 @@ function autoTick() {
   const diff = meanAbsDiff(gray, camPrevGray);
   camPrevGray = gray;
   const present = (stats.insideMean - stats.outsideMean > 6) || stats.edgeRatio > 0.022;
+  /* 撮影済みのまま静止していると連写してしまうので、書類が消えるか
+     大きく動く (入れ替え) までは再撮影しない */
+  if (!camAutoArmed) {
+    if (!present || diff > 30) { camAutoArmed = true; camStableCount = 0; camPresentCount = 0; }
+    else { setCamStatus("撮影しました"); return; }
+  }
   const stable = diff < 9.0;
   if (present) camPresentCount++; else camPresentCount = 0;
   if (present && stable) camStableCount++; else camStableCount = 0;
@@ -1010,6 +1298,7 @@ function autoTick() {
   if (camStableCount >= 3 || (camPresentCount >= 15 && diff < 16)) {
     camStableCount = 0;
     camPresentCount = 0;
+    camAutoArmed = false;
     captureFromCamera();
   }
 }
@@ -1022,19 +1311,26 @@ async function captureFromCamera() {
   flash.classList.remove("hidden");
   setTimeout(() => flash.classList.add("hidden"), 130);
   try {
-    const dims = downscaleDims(v.videoWidth, v.videoHeight, 2400);
+    const dims = downscaleDims(v.videoWidth, v.videoHeight, MAX_IMPORT_DIM);
     const c = document.createElement("canvas");
     c.width = dims.w; c.height = dims.h;
     c.getContext("2d").drawImage(v, 0, 0, dims.w, dims.h);
     const blob = await canvasBlob(c, "image/jpeg", 0.92);
     if (!blob) throw new Error("撮影に失敗しました");
-    /* ガイド枠に合わせて自動で切り抜く (隅の初期値をガイド枠にする) */
+    /* ガイド枠を目安に、実際の書類の隅を検出して切り抜く (検出できなければガイド枠) */
     let corners = null;
     if (camGuide) {
-      corners = guideCornersFrac(camGuide, window.innerWidth, window.innerHeight, v.videoWidth, v.videoHeight);
+      const guide = guideCornersFrac(camGuide, window.innerWidth, window.innerHeight, v.videoWidth, v.videoHeight);
+      corners = guide;
+      try {
+        const g = grayFromDrawable(c, c.width, c.height);
+        const det = detectDocCorners(g.gray, g.w, g.h, guide, 0.10);
+        if (det) corners = det;
+      } catch (e) { /* ガイド枠のまま */ }
     }
     await importBlob(blob, corners);
     editDirty = true;
+    camAutoArmed = false;   // 手動シャッターでも、直後の自動撮影で二重に撮らない
     camSessionPages++;
     updateCamCount();
     showToast("ページを追加しました（" + pages.length + "枚）");
@@ -1050,6 +1346,7 @@ async function captureFromCamera() {
 
 /* ================= OCR ================= */
 let ocrWorker = null;
+let ocrTextPages = null;   // テキスト欄に並んでいるページ (書き戻しの対象)
 async function getOcrWorker() {
   if (ocrWorker) return ocrWorker;
   if (typeof Tesseract === "undefined") throw new Error("OCRの読み込みに失敗しました（通信環境を確認してください）");
@@ -1063,12 +1360,71 @@ async function getOcrWorker() {
       }
     }
   });
+  // 日本語の文書・表を想定した認識設定
+  await ocrWorker.setParameters({
+    tessedit_pageseg_mode: "6",       // 均一なテキストブロックとして認識
+    preserve_interword_spaces: "1",
+    user_defined_dpi: "300"
+  });
   return ocrWorker;
+}
+/* OCR専用の前処理。表示・PDF用画像は変更しない。
+   照明ムラに対応する局所平均二値化で、薄い文字と背景の影を分離しやすくする。 */
+function preprocessOCR(source) {
+  let w = source.width, h = source.height;
+  // 小さい画像は文字を読みやすくするため拡大。ただし最大辺は2400pxに制限 (12 mini の負荷対策)。
+  const scale = Math.min(w < 1500 ? 1.5 : 1, 2400 / Math.max(w, h));
+  if (scale > 1) {
+    const up = document.createElement("canvas");
+    up.width = Math.round(w * scale); up.height = Math.round(h * scale);
+    up.getContext("2d").drawImage(source, 0, 0, up.width, up.height);
+    source = up; w = up.width; h = up.height;
+  }
+  const ctx = source.getContext("2d", { willReadFrequently: true });
+  const im = ctx.getImageData(0, 0, w, h), d = im.data;
+  const n = w * h;
+  const gray = new Uint8Array(n);
+  for (let i = 0, p = 0; i < n; i++, p += 4) {
+    gray[i] = Math.round(0.299 * d[p] + 0.587 * d[p + 1] + 0.114 * d[p + 2]);
+  }
+  // 積分画像を使い、近傍 (半径は画像サイズ比) の平均輝度で局所二値化する。
+  const stride = w + 1;
+  const integral = new Uint32Array((w + 1) * (h + 1));
+  for (let y = 1; y <= h; y++) {
+    let rowSum = 0;
+    for (let x = 1; x <= w; x++) {
+      rowSum += gray[(y - 1) * w + x - 1];
+      integral[y * stride + x] = integral[(y - 1) * stride + x] + rowSum;
+    }
+  }
+  const radius = Math.max(12, Math.round(Math.min(w, h) * 0.012));
+  const bias = 8; // 平均より少し暗い画素を文字として残す
+  for (let y = 0; y < h; y++) {
+    const y1 = Math.max(0, y - radius), y2 = Math.min(h, y + radius + 1);
+    for (let x = 0; x < w; x++) {
+      const x1 = Math.max(0, x - radius), x2 = Math.min(w, x + radius + 1);
+      const sum = integral[y2 * stride + x2] - integral[y1 * stride + x2] - integral[y2 * stride + x1] + integral[y1 * stride + x1];
+      const mean = sum / ((x2 - x1) * (y2 - y1));
+      const v = gray[y * w + x];
+      const bw = v < mean - bias ? 0 : 255;
+      const p = (y * w + x) * 4;
+      d[p] = d[p + 1] = d[p + 2] = bw; d[p + 3] = 255;
+    }
+  }
+  ctx.putImageData(im, 0, 0);
+  return source;
 }
 async function ocrPage(page) {
   const worker = await getOcrWorker();
-  const canvas = renderPage(page);
+  // ページ表示のフィルタ（強調等）はOCRに影響させず、原画像からOCR用に処理
+  const source = renderPage(page, 2400, false);
+  const canvas = preprocessOCR(source);
   const res = await worker.recognize(canvas);
+  /* PDFのテキスト層用に、単語の位置もページに残す */
+  page.words = extractOcrWords(res.data);
+  page.ocrW = canvas.width;
+  page.ocrH = canvas.height;
+  page.ocrDone = true;
   return (res.data.text || "").trim();
 }
 async function runOcr(targetPages) {
@@ -1084,13 +1440,21 @@ async function runOcr(targetPages) {
       editDirty = true;
       parts.push(text);
     }
-    $("ocrText").value = parts.filter(t => t).join("\n\n----- 次のページ -----\n\n");
+    $("ocrText").value = parts.join(OCR_PAGE_SEP);
+    ocrTextPages = targetPages.slice();
     $("ocrStatus").textContent = "完了しました";
   } catch (err) {
     $("ocrStatus").textContent = "失敗しました：" + (err && err.message ? err.message : err);
   } finally {
     $("btnOcrPage").disabled = false; $("btnOcrAll").disabled = false;
   }
+}
+/* テキスト欄で手直しした内容を、各ページの ocr に書き戻す (区切りの数が合うときだけ) */
+function syncOcrTextToPages() {
+  if (!ocrTextPages || !ocrTextPages.length) return;
+  const parts = splitOcrText($("ocrText").value, ocrTextPages.length);
+  if (!parts) return;
+  ocrTextPages.forEach((p, i) => { p.ocr = parts[i]; });
 }
 $("btnOcrPage").addEventListener("click", () => {
   const page = getPage(activePageId);
@@ -1110,6 +1474,18 @@ $("btnClearText").addEventListener("click", () => { $("ocrText").value = ""; });
 function canvasBlob(canvas, type, q) {
   return new Promise(res => canvas.toBlob(res, type, q));
 }
+/* PDFのテキスト層のために、まだOCRしていないページを読み取る。読み取った数を返す */
+async function ensureWords(src) {
+  const targets = src.filter(p => !p.ocrDone);
+  for (let i = 0; i < targets.length; i++) {
+    showLoading("文字を読み取り中…（" + (i + 1) + "/" + targets.length + "ページ）");
+    try { targets[i].ocr = await ocrPage(targets[i]); }
+    catch (e) { /* テキスト層なしで続ける */ }
+  }
+  if (targets.length) showLoading("PDFを作成中…");
+  return targets.length;
+}
+
 async function buildImageFiles(srcPages) {
   const src = srcPages || pages;
   const name = "scan_" + stamp();
@@ -1120,8 +1496,40 @@ async function buildImageFiles(srcPages) {
   }
   return files;
 }
+/* テキスト層用の日本語フォント (M PLUS 1p)。初回だけ取得し、端末にキャッシュする */
+const PDF_FONT_URL = "https://raw.githubusercontent.com/google/fonts/main/ofl/mplus1p/MPLUS1p-Regular.ttf";
+let pdfFontPromise = null;
+function loadPdfFontBytes() {
+  if (pdfFontPromise) return pdfFontPromise;
+  pdfFontPromise = (async () => {
+    try {
+      if (window.caches) {
+        const cache = await caches.open("scanocr-font-v1");
+        const hit = await cache.match(PDF_FONT_URL);
+        if (hit) return await hit.arrayBuffer();
+        const res = await fetch(PDF_FONT_URL);
+        if (res.ok) {
+          cache.put(PDF_FONT_URL, res.clone()).catch(() => {});
+          return await res.arrayBuffer();
+        }
+      }
+    } catch (e) { /* キャッシュが使えなければ直接取得する */ }
+    const res = await fetch(PDF_FONT_URL);
+    if (!res.ok) throw new Error("フォントを取得できませんでした");
+    return await res.arrayBuffer();
+  })();
+  pdfFontPromise.catch(() => { pdfFontPromise = null; });
+  return pdfFontPromise;
+}
+
+/* PDFを作る。pdf-lib が使えれば、OCRした文字を透明テキストとして重ねる
+   (GoodNotes などで文字を選択・検索できる)。だめなときは jsPDF (画像のみ) に落とす */
 async function buildPdfFile(srcPages) {
   const src = srcPages || pages;
+  if (typeof window.PDFLib !== "undefined") {
+    try { return await buildPdfFileLib(src); }
+    catch (e) { /* jsPDF にフォールバック */ }
+  }
   if (typeof window.jspdf === "undefined") throw new Error("PDFの読み込みに失敗しました（通信環境を確認してください）");
   const { jsPDF } = window.jspdf;
   let doc = null;
@@ -1134,6 +1542,40 @@ async function buildPdfFile(srcPages) {
   }
   const blob = doc.output("blob");
   return new File([blob], "scan_" + stamp() + ".pdf", { type: "application/pdf" });
+}
+async function buildPdfFileLib(src) {
+  const { PDFDocument, pushGraphicsState, popGraphicsState, setTextRenderingMode, TextRenderingMode } = window.PDFLib;
+  const doc = await PDFDocument.create();
+  /* テキスト層: 単語があるページが1つでもあればフォントを用意する (使った文字だけ埋め込む) */
+  let font = null;
+  if (typeof window.fontkit !== "undefined" && src.some(p => p.words && p.words.length)) {
+    try {
+      doc.registerFontkit(window.fontkit);
+      font = await doc.embedFont(await loadPdfFontBytes(), { subset: true });
+    } catch (e) { font = null; }
+  }
+  for (const p of src) {
+    const canvas = renderPage(p);
+    const blob = await canvasBlob(canvas, "image/jpeg", 0.88);
+    if (!blob) throw new Error("画像の変換に失敗しました");
+    const img = await doc.embedJpg(await blob.arrayBuffer());
+    const wPt = 210 * 72 / 25.4, hPt = wPt * canvas.height / canvas.width;
+    const page = doc.addPage([wPt, hPt]);
+    page.drawImage(img, { x: 0, y: 0, width: wPt, height: hPt });
+    if (font && p.words && p.words.length && p.ocrW && p.ocrH) {
+      page.pushOperators(pushGraphicsState(), setTextRenderingMode(TextRenderingMode.Invisible));
+      for (const wd of p.words) {
+        const r = wordRectPt(wd, p.ocrW, p.ocrH, wPt, hPt);
+        if (r.h < 3 || r.w < 2) continue;
+        try {
+          page.drawText(wd.t, { x: r.x, y: hPt - r.y - r.h, size: Math.min(72, Math.max(4, r.h * 0.95)), font });
+        } catch (e) { /* その単語は飛ばす */ }
+      }
+      page.pushOperators(popGraphicsState());
+    }
+  }
+  const bytes = await doc.save();
+  return new File([bytes], "scan_" + stamp() + ".pdf", { type: "application/pdf" });
 }
 async function shareFiles(files, text) {
   const payload = { files };
@@ -1171,6 +1613,9 @@ async function doAction(action) {
     showLoading("準備中…");
     let doneMsg = "";
     try {
+      if (action === "share-pdf" || action === "drive-upload") {
+        if (await ensureWords(pages)) editDirty = true;
+      }
       if (action === "share-image") {
         await shareFiles(await buildImageFiles());
       } else if (action === "share-pdf") {
@@ -1309,6 +1754,7 @@ function startNewScan() {
   pages = []; activePageId = null; editorPage = null;
   $("editorCard").classList.add("hidden");
   $("ocrText").value = "";
+  ocrTextPages = null;
   editingId = null; editingName = ""; editingCreatedAt = 0; editDirty = false;
 }
 $("btnBackList").addEventListener("click", () => {
@@ -1381,7 +1827,9 @@ async function pageToStored(page) {
   return {
     buf, w: page.w, h: page.h, rotation: page.rotation,
     corners: page.corners.map(p => ({ x: p.x, y: p.y })),
-    filter: page.filter, ocr: page.ocr || ""
+    filter: page.filter, ocr: page.ocr || "",
+    words: page.words || null, ocrW: page.ocrW || 0, ocrH: page.ocrH || 0,
+    ocrDone: !!page.ocrDone
   };
 }
 async function storedToPage(sp) {
@@ -1391,19 +1839,15 @@ async function storedToPage(sp) {
     id: ++pageSeq, img: d.src, w: d.w, h: d.h,
     rotation: sp.rotation || 0,
     corners: (sp.corners || []).map(p => ({ x: p.x, y: p.y })),
-    filter: sp.filter || "enhance", ocr: sp.ocr || ""
+    filter: sp.filter || "enhance", ocr: sp.ocr || "",
+    words: sp.words || null, ocrW: sp.ocrW || 0, ocrH: sp.ocrH || 0,
+    ocrDone: !!sp.ocrDone
   };
 }
 function defaultScanName() {
   const d = new Date();
   const p = n => String(n).padStart(2, "0");
   return "スキャン " + d.getFullYear() + "/" + p(d.getMonth() + 1) + "/" + p(d.getDate()) +
-    " " + p(d.getHours()) + ":" + p(d.getMinutes());
-}
-function formatDateTime(ts) {
-  const d = new Date(ts);
-  const p = n => String(n).padStart(2, "0");
-  return d.getFullYear() + "/" + p(d.getMonth() + 1) + "/" + p(d.getDate()) +
     " " + p(d.getHours()) + ":" + p(d.getMinutes());
 }
 function formatDate(ts) {
@@ -1413,6 +1857,7 @@ function formatDate(ts) {
 }
 $("btnSaveScan").addEventListener("click", async () => {
   if (!pages.length) { alert("ページがありません"); return; }
+  syncOcrTextToPages();
   let name = editingName;
   if (editingId === null) {
     name = prompt("保存名", defaultScanName());
@@ -1431,6 +1876,7 @@ $("btnSaveScan").addEventListener("click", async () => {
       await idbPut({ id: editingId, name: editingName, createdAt: editingCreatedAt, pages: stored });
     }
     editDirty = false;
+    libThumbCache.delete(editingId);   // 一覧のサムネイルを作り直す
     showToast("保存しました");
   } catch (e) {
     alert("保存できませんでした：" + (e && e.message ? e.message : e));
@@ -1484,6 +1930,17 @@ async function renderLibrary() {
       try {
         const loaded = [];
         for (const sp of rec.pages) loaded.push(await storedToPage(sp));
+        if (await ensureWords(loaded)) {
+          /* 読み取った文字を保存にも残す (次回から速い)。
+             画像は元の保存データをそのまま使い、OCRの結果だけを重ねる (再圧縮しない) */
+          try {
+            const stored = rec.pages.map((sp, i) => Object.assign({}, sp, {
+              ocr: loaded[i].ocr || "", words: loaded[i].words || null,
+              ocrW: loaded[i].ocrW || 0, ocrH: loaded[i].ocrH || 0, ocrDone: !!loaded[i].ocrDone
+            }));
+            await idbPut({ id: rec.id, name: rec.name, createdAt: rec.createdAt, pages: stored });
+          } catch (e) { /* 保存できなくても共有は続ける */ }
+        }
         const pdf = await buildPdfFile(loaded);
         const safeName = (rec.name || "scan").replace(/[\\\/:*?"<>|]/g, "_");
         const named = new File([pdf], safeName + ".pdf", { type: "application/pdf" });
@@ -1521,8 +1978,8 @@ async function openSavedScan(rec) {
     $("editorCard").classList.add("hidden");
     activePageId = pages.length ? pages[0].id : null;
     editingId = rec.id; editingName = rec.name; editingCreatedAt = rec.createdAt; editDirty = false;
-    const texts = pages.map(p => p.ocr).filter(t => t);
-    $("ocrText").value = texts.join("\n\n----- 次のページ -----\n\n");
+    $("ocrText").value = pages.map(p => p.ocr).join(OCR_PAGE_SEP);
+    ocrTextPages = pages.slice();
     showEdit();
     showToast("「" + rec.name + "」を開きました");
   } catch (e) {
