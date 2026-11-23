@@ -11,67 +11,85 @@
 <meta name="apple-mobile-web-app-title" content="スキャンOCR">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ececf0; --card: #fff; --text: #1c1c1e; --muted: #8e8e93; --sub: #48484a;
+    --border: #c7c7cc; --border2: #d1d1d6; --field: #fbfbfd; --accent: #007aff;
+    --danger: #ff3b30; --badge: #ff9f0a; --thumb-bg: #f2f2f7; --divider: #e5e5ea;
+    --shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000; --card: #1c1c1e; --text: #f2f2f7; --muted: #98989f; --sub: #aeaeb2;
+      --border: #48484a; --border2: #3a3a3c; --field: #2c2c2e; --accent: #0a84ff;
+      --danger: #ff453a; --badge: #ff9f0a; --thumb-bg: #2c2c2e; --divider: #38383a;
+      --shadow: 0 1px 3px rgba(0,0,0,.4);
+    }
+  }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; }
   body {
     font-family: -apple-system, "Hiragino Kaku Gothic ProN", sans-serif;
-    background: #ececf0; color: #1c1c1e; font-size: 16px;
-    padding: env(safe-area-inset-top) 12px calc(env(safe-area-inset-bottom) + 16px);
+    background: var(--bg); color: var(--text); font-size: 16px; line-height: 1.4;
+    padding: env(safe-area-inset-top) 10px calc(env(safe-area-inset-bottom) + 12px);
   }
-  h1 { font-size: 20px; margin: 12px 2px 8px; }
-  h2 { font-size: 16px; margin: 0 0 8px; }
+  h1 { font-size: 20px; margin: 8px 2px 6px; }
+  h2 { font-size: 16px; margin: 0 0 6px; }
   .card {
-    background: #fff; border-radius: 14px; padding: 12px;
-    margin: 10px 0; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    background: var(--card); border-radius: 14px; padding: 10px;
+    margin: 8px 0; box-shadow: var(--shadow);
   }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; }
-  .row > * { flex: 1; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .row > * { flex: 1; min-width: 0; }
   button {
-    appearance: none; border: 1px solid #c7c7cc; background: #fff; color: #1c1c1e;
-    border-radius: 10px; padding: 11px 8px; font-size: 15px; cursor: pointer;
-    box-shadow: 0 1px 2px rgba(0,0,0,.06);
+    appearance: none; border: 1px solid var(--border); background: var(--card); color: var(--text);
+    border-radius: 10px; padding: 9px 6px; font-size: 16px; cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06); white-space: nowrap;
   }
   button:active { transform: translateY(1px); }
-  button.primary { background: #007aff; border-color: #007aff; color: #fff; font-weight: 600; }
-  button.big { padding: 14px 8px; font-size: 16px; }
-  button.small { padding: 7px 8px; font-size: 13px; }
-  button.danger { color: #ff3b30; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.big { padding: 12px 6px; font-size: 16px; }
+  button.small { padding: 6px 6px; font-size: 14px; }
+  button.danger { color: var(--danger); }
   button:disabled { opacity: .45; }
-  button.selected { background: #007aff; border-color: #007aff; color: #fff; }
-  .muted { color: #8e8e93; font-size: 13px; }
-  .pages { display: flex; gap: 10px; flex-wrap: wrap; }
+  button.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .pages { display: flex; gap: 8px; flex-wrap: wrap; }
   .page-thumb { width: 86px; text-align: center; }
   .page-thumb img {
     width: 86px; height: 110px; object-fit: cover; border-radius: 8px;
-    border: 2px solid #d1d1d6; background: #f2f2f7;
+    border: 2px solid var(--border2); background: var(--thumb-bg);
   }
-  .page-thumb.active img { border-color: #007aff; }
-  .page-thumb .cap { font-size: 12px; color: #48484a; margin-top: 2px; }
+  .page-thumb.active img { border-color: var(--accent); }
+  .page-thumb .cap { font-size: 14px; color: var(--sub); margin-top: 1px; }
   #editorWrap { position: relative; width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
   #editorImg { width: 100%; display: block; border-radius: 8px; }
   #editorSvg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   .handle {
     position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px;
-    border-radius: 50%; background: rgba(0,122,255,.25); border: 2px solid #007aff;
+    border-radius: 50%; background: rgba(0,122,255,.25); border: 2px solid var(--accent);
     touch-action: none; cursor: grab;
   }
   textarea {
-    width: 100%; min-height: 150px; border: 1px solid #d1d1d6; border-radius: 10px;
-    padding: 10px; font-size: 15px; font-family: inherit; background: #fbfbfd;
+    width: 100%; min-height: 110px; border: 1px solid var(--border2); border-radius: 10px;
+    padding: 8px; font-size: 16px; font-family: inherit; background: var(--field); color: var(--text);
   }
   input[type="text"], select {
-    width: 100%; border: 1px solid #d1d1d6; border-radius: 10px; padding: 10px;
-    font-size: 15px; background: #fff; font-family: inherit;
+    width: 100%; border: 1px solid var(--border2); border-radius: 10px; padding: 9px;
+    font-size: 16px; background: var(--card); color: var(--text); font-family: inherit;
   }
   .fav-item {
-    display: flex; align-items: center; gap: 8px; padding: 8px 0;
-    border-bottom: 1px solid #e5e5ea;
+    display: flex; align-items: center; gap: 6px; padding: 6px 0;
+    border-bottom: 1px solid var(--divider);
   }
   .fav-item:last-child { border-bottom: none; }
-  .fav-item .name { flex: 1; font-size: 15px; }
+  .fav-item .name {
+    flex: 1; min-width: 0; font-size: 14px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
   .badge {
-    font-size: 11px; background: #ff9f0a; color: #fff; border-radius: 6px;
-    padding: 2px 6px; font-weight: 600;
+    font-size: 14px; background: var(--badge); color: #fff; border-radius: 6px;
+    padding: 0 6px; font-weight: 600; white-space: nowrap;
   }
   #progressWrap { display: none; }
   progress { width: 100%; height: 14px; }
@@ -80,12 +98,103 @@
   details.card summary::-webkit-details-marker { display: none; }
   .seg { display: flex; gap: 6px; }
   .seg button { flex: 1; }
+
+  /* タブ */
+  .tabs { display: flex; gap: 5px; margin: 2px 0 2px; }
+  .tabs button { flex: 1; }
+  /* 保存ライブラリ */
+  .lib-item {
+    display: flex; gap: 8px; align-items: center; padding: 6px 0;
+    border-bottom: 1px solid var(--divider);
+  }
+  .lib-item:last-child { border-bottom: none; }
+  .lib-item img {
+    width: 54px; height: 70px; object-fit: cover; border-radius: 6px;
+    border: 1px solid var(--border2); background: var(--thumb-bg);
+  }
+  .lib-item .info { flex: 1; min-width: 0; }
+  .lib-item .name { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lib-item .meta { font-size: 14px; color: var(--muted); margin-top: 1px; white-space: nowrap; }
+  .lib-item .acts { display: flex; flex-direction: column; gap: 5px; }
+
+  /* 処理中オーバーレイ */
+  #loadingOverlay {
+    position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,.45);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  }
+  #loadingOverlay p { color: #fff; font-size: 15px; margin: 0; }
+  .spinner {
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 4px solid rgba(255,255,255,.3); border-top-color: #fff;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* トースト */
+  #toast {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 28px);
+    transform: translateX(-50%); z-index: 90;
+    background: rgba(28,28,30,.92); color: #fff; font-size: 14px;
+    padding: 10px 16px; border-radius: 999px; white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  }
+
+  /* アプリ内カメラ */
+  #cameraOverlay { position: fixed; inset: 0; z-index: 50; background: #000; }
+  #camVideo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .cam-shade { position: absolute; background: rgba(0,0,0,.48); }
+  #camGuide { position: absolute; border: 1.5px solid rgba(255,255,255,.9); border-radius: 4px; }
+  #camGuide .gc { position: absolute; width: 26px; height: 26px; }
+  #camGuide .gc.tl { top: -3px; left: -3px; border-top: 4px solid #fff; border-left: 4px solid #fff; border-top-left-radius: 6px; }
+  #camGuide .gc.tr { top: -3px; right: -3px; border-top: 4px solid #fff; border-right: 4px solid #fff; border-top-right-radius: 6px; }
+  #camGuide .gc.bl { bottom: -3px; left: -3px; border-bottom: 4px solid #fff; border-left: 4px solid #fff; border-bottom-left-radius: 6px; }
+  #camGuide .gc.br { bottom: -3px; right: -3px; border-bottom: 4px solid #fff; border-right: 4px solid #fff; border-bottom-right-radius: 6px; }
+  .cam-topbar {
+    position: absolute; top: 0; left: 0; right: 0;
+    padding: calc(env(safe-area-inset-top) + 10px) 12px 0;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .cam-btn {
+    background: rgba(28,28,30,.68); color: #fff; border: none; box-shadow: none;
+    border-radius: 999px; padding: 9px 14px; font-size: 14px;
+  }
+  .cam-btn.on { background: #0a84ff; }
+  #camHint {
+    position: absolute; left: 0; right: 0; text-align: center;
+    top: calc(env(safe-area-inset-top) + 58px);
+    color: #fff; font-size: 14px; text-shadow: 0 1px 4px rgba(0,0,0,.8); padding: 0 16px;
+  }
+  #camStatus {
+    position: absolute; left: 0; right: 0; text-align: center;
+    bottom: calc(env(safe-area-inset-bottom) + 118px);
+    color: #fff; font-size: 15px; font-weight: 600; text-shadow: 0 1px 4px rgba(0,0,0,.8); padding: 0 16px;
+  }
+  #btnShutter {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    bottom: calc(env(safe-area-inset-bottom) + 24px);
+    width: 74px; height: 74px; border-radius: 50%;
+    background: #fff; border: none; box-shadow: 0 0 0 5px rgba(255,255,255,.35);
+    padding: 0;
+  }
+  #btnShutter:active { transform: translateX(-50%) scale(.94); }
+  #camCount {
+    position: absolute; left: 14px; bottom: calc(env(safe-area-inset-bottom) + 44px);
+    color: #fff; font-size: 14px; background: rgba(28,28,30,.68);
+    padding: 6px 10px; border-radius: 999px;
+  }
+  #camFlash { position: absolute; inset: 0; background: #fff; opacity: .85; }
 </style>
 </head>
 <body>
 
 <h1>📄 スキャンOCR</h1>
 
+<div class="tabs">
+  <button id="tabScan" class="selected">📷 スキャン</button>
+  <button id="tabLib">💾 保存</button>
+</div>
+
+<div id="viewScan">
 <div class="card">
   <div class="row">
     <button class="primary big" id="btnCamera">📷 撮影する</button>
@@ -93,7 +202,7 @@
   </div>
   <input type="file" id="fileCamera" accept="image/*" capture="environment" class="hidden">
   <input type="file" id="fileLibrary" accept="image/*" class="hidden">
-  <p class="muted" style="margin:8px 0 0;">書類を撮ると、下のページ一覧に追加されます。ページを選ぶと切り抜き（台形補正）ができます。</p>
+  <p class="muted" style="margin:6px 0 0;">撮るとページ一覧に追加されます。選ぶと切り抜き（台形補正）ができます。</p>
 </div>
 
 <div class="card" id="pagesCard">
@@ -101,8 +210,10 @@
   <div class="pages" id="pageList"></div>
   <p class="muted" id="noPages">まだページがありません。</p>
   <div class="row" style="margin-top:10px;">
+    <button id="btnSaveScan" class="primary">💾 スキャン保存</button>
     <button id="btnClearAll" class="danger">全部消す</button>
   </div>
+  <p class="muted" style="margin:6px 0 0;">保存したスキャンは「保存」タブに残ります。</p>
 </div>
 
 <div class="card hidden" id="editorCard">
@@ -123,8 +234,8 @@
   </div>
   <div class="row">
     <button id="btnRotate">↻ 回転</button>
-    <button id="btnResetCorners">隅をリセット</button>
-    <button id="btnDeletePage" class="danger">このページを削除</button>
+    <button id="btnResetCorners">隅リセット</button>
+    <button id="btnDeletePage" class="danger">ページ削除</button>
   </div>
   <div class="row" style="margin-top:8px;">
     <button id="btnCloseEditor" class="primary">完了</button>
@@ -134,8 +245,8 @@
 <div class="card">
   <h2>テキスト化（OCR）</h2>
   <div class="row">
-    <button id="btnOcrPage">このページをOCR</button>
-    <button id="btnOcrAll" class="primary">全ページをOCR</button>
+    <button id="btnOcrPage">ページOCR</button>
+    <button id="btnOcrAll" class="primary">全ページOCR</button>
   </div>
   <div id="progressWrap" style="margin-top:10px;">
     <progress id="ocrProgress" value="0" max="1"></progress>
@@ -143,10 +254,10 @@
   </div>
   <textarea id="ocrText" placeholder="OCRの結果がここに出ます。手書きは精度が落ちます。その場合は下の「Museに送る」が確実です。" style="margin-top:10px;"></textarea>
   <div class="row" style="margin-top:8px;">
-    <button id="btnCopyText">テキストをコピー</button>
-    <button id="btnClearText">テキストを消す</button>
+    <button id="btnCopyText">テキストコピー</button>
+    <button id="btnClearText">テキスト消去</button>
   </div>
-  <p class="muted" style="margin:8px 0 0;">初回のOCRだけ、日本語データの取得で少し時間がかかります（2回目からは速くなります）。</p>
+  <p class="muted" style="margin:6px 0 0;">初回のみ、日本語データの取得で時間がかかります。</p>
 </div>
 
 <div class="card">
@@ -159,7 +270,17 @@
   <div class="row" style="margin-top:8px;">
     <button id="btnAskClaude" class="primary">🤖 Museに送る（読み取りを頼む）</button>
   </div>
-  <p class="muted" style="margin:8px 0 0;">共有は iPhone の共有シートから、写真・ファイル・GoodNotes などへ渡せます。「Museに送る」は画像と一緒に「読み取ってテキスト化して」と送ります。</p>
+  <p class="muted" style="margin:6px 0 0;">共有シートから写真・ファイル・GoodNotesなどへ渡せます。「Museに送る」は読み取り依頼つきです。</p>
+</div>
+</div><!-- /viewScan -->
+
+<div id="viewLib" class="hidden">
+  <div class="card">
+    <h2>保存したスキャン <span class="muted" id="libCount"></span></h2>
+    <div id="libList"></div>
+    <p class="muted" id="libEmpty">保存したスキャンはまだありません。「スキャン」タブで撮って、「このスキャンを保存」を押すとここに残ります。</p>
+    <p class="muted" style="margin:6px 0 0;">保存先はiPhone内です。空き容量が極端に少ないとiOSが消すことがあります。大事なものはPDFや画像でも残してください。</p>
+  </div>
 </div>
 
 <details class="card">
@@ -170,8 +291,8 @@
   <select id="favAction" style="margin-top:8px;">
     <option value="share-pdf">PDFで共有</option>
     <option value="share-image">画像で共有</option>
-    <option value="copy-text">テキストをコピー</option>
-    <option value="share-text">テキストを共有</option>
+    <option value="copy-text">テキストコピー</option>
+    <option value="share-text">テキスト共有</option>
     <option value="ask-claude">Museに送る</option>
   </select>
   <div class="row" style="margin-top:8px;">
@@ -182,14 +303,44 @@
 
 <details class="card">
   <summary>使い方</summary>
-  <p class="muted" style="line-height:1.7;">
-    1. 「撮影する」で書類を撮ります（複数ページは繰り返し追加）。<br>
+  <p class="muted" style="line-height:1.55;">
+    1. 「撮影する」でカメラが開きます。白い枠に書類全体を合わせてください。「自動撮影」をオンにすると、書類を検出して手ぶれが収まったら自動で撮ります。手動は下の白い丸ボタンです。続けて撮ると複数ページになります。「閉じる」で戻ると、最後のページの編集画面になります。<br>
     2. ページを選んで、青い丸を書類の四隅に合わせると台形補正されます。「強調」にすると文字が読みやすくなります。<br>
     3. 「全ページをOCR」でテキスト化できます。印刷文字向けです。<br>
     4. 保存・共有から、画像／PDF／テキストで渡せます。よく使う渡し方は「お気に入り」に登録しておくと、選ぶだけで実行できます。<br>
-    5. 手書きや読みにくい書類は「Museに送る」が確実です。
+    5. 手書きや読みにくい書類は「Museに送る」が確実です。<br>
+    6. 「このスキャンを保存」を押すと、アプリ内の「保存」タブに残せます。保存したスキャンは後から開いて、編集・OCR・共有ができます。<br>
+    ※カメラが開かない環境では、通常のカメラ（写真の確認画面）に切り替わります。画面の色は iPhone のライト／ダーク設定に自動で合います。
   </p>
 </details>
+
+<div id="cameraOverlay" class="hidden">
+  <video id="camVideo" autoplay playsinline muted></video>
+  <div class="cam-shade" id="shadeTop"></div>
+  <div class="cam-shade" id="shadeBottom"></div>
+  <div class="cam-shade" id="shadeLeft"></div>
+  <div class="cam-shade" id="shadeRight"></div>
+  <div id="camGuide">
+    <span class="gc tl"></span><span class="gc tr"></span><span class="gc bl"></span><span class="gc br"></span>
+  </div>
+  <div class="cam-topbar">
+    <button id="btnCamClose" class="cam-btn">✕ 閉じる</button>
+    <button id="btnAutoToggle" class="cam-btn">自動撮影：OFF</button>
+  </div>
+  <div id="camHint">書類全体が枠に入るように合わせてください</div>
+  <div id="camStatus"></div>
+  <div id="camCount" class="hidden">ページ合計 0枚</div>
+  <button id="btnShutter" aria-label="撮影する"></button>
+  <div id="camFlash" class="hidden"></div>
+  <canvas id="camSample" class="hidden"></canvas>
+</div>
+
+<div id="loadingOverlay" class="hidden">
+  <div class="spinner"></div>
+  <p id="loadingText">処理中…</p>
+</div>
+
+<div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
@@ -198,7 +349,8 @@
 
 /* ================= 状態 ================= */
 const LS_FAV = "scanocr.favorites.v1";
-let pages = [];           // {id, img, rotation, corners:[{x,y}x4] (回転後の画像座標, 0..1), filter, ocr}
+const MAX_IMPORT_DIM = 2048;   // 取り込み直後にこのサイズへ縮小する（固まり対策）
+let pages = [];           // {id, img, w, h, rotation, corners:[{x,y}x4] (回転後の画像座標, 0..1), filter, ocr}
 let activePageId = null;
 let pageSeq = 0;
 let favorites = loadFavorites();
@@ -271,34 +423,130 @@ function warpOutputSize(cornersPx) {
   const scale = Math.min(1, 2400 / Math.max(w, h));
   return { w: Math.max(2, Math.round(w * scale)), h: Math.max(2, Math.round(h * scale)) };
 }
+/* 長辺が maxDim 以下になるよう縮小した寸法を返す */
+function downscaleDims(w, h, maxDim) {
+  const scale = Math.min(1, maxDim / Math.max(w, h));
+  return { w: Math.max(1, Math.round(w * scale)), h: Math.max(1, Math.round(h * scale)) };
+}
+/* object-fit: cover 表示のとき、映像のうち画面に見えている範囲 (映像ピクセル座標) を返す */
+function videoCropRect(vw, vh, ow, oh) {
+  const scale = Math.max(ow / vw, oh / vh);
+  const cw = ow / scale, ch = oh / scale;
+  return { x: (vw - cw) / 2, y: (vh - ch) / 2, w: cw, h: ch };
+}
+/* ガイド枠 (画面ピクセル) を計算する。A4縦の比率で、画面に収まる大きさにする */
+function guideRectFor(ow, oh) {
+  let gw = ow * 0.88;
+  let gh = gw / 0.7071;
+  if (gh > oh * 0.60) { gh = oh * 0.60; gw = gh * 0.7071; }
+  return { x: (ow - gw) / 2, y: (oh - gh) / 2 - oh * 0.03, w: gw, h: gh };
+}
+/* サンプル画像 (グレースケール配列) から、枠内の明るさ・枠外の明るさ・枠内のエッジ割合を出す */
+function analyzeSample(gray, w, h, rect) {
+  const x0 = Math.max(0, Math.floor(rect.x)), y0 = Math.max(0, Math.floor(rect.y));
+  const x1 = Math.min(w, Math.ceil(rect.x + rect.w)), y1 = Math.min(h, Math.ceil(rect.y + rect.h));
+  let inSum = 0, inCnt = 0, outSum = 0, outCnt = 0, edges = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const v = gray[y * w + x];
+      if (x >= x0 && x < x1 && y >= y0 && y < y1) {
+        inSum += v; inCnt++;
+        if (x + 1 < x1 && y + 1 < y1) {
+          const g = Math.abs(gray[y * w + x + 1] - v) + Math.abs(gray[(y + 1) * w + x] - v);
+          if (g > 44) edges++;
+        }
+      } else { outSum += v; outCnt++; }
+    }
+  }
+  return {
+    insideMean: inCnt ? inSum / inCnt : 0,
+    outsideMean: outCnt ? outSum / outCnt : 0,
+    edgeRatio: inCnt ? edges / inCnt : 0
+  };
+}
+/* 2つのグレースケール配列の平均絶対差 (手ぶれ・動きの量) */
+function meanAbsDiff(a, b) {
+  if (!a || !b || a.length !== b.length) return 999;
+  let s = 0;
+  for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]);
+  return s / a.length;
+}
 /*__PURE_END__*/
 
-/* ================= 画像の取り込み ================= */
+/* ================= 共通UI ================= */
 const $ = id => document.getElementById(id);
-$("btnCamera").addEventListener("click", () => $("fileCamera").click());
-$("btnLibrary").addEventListener("click", () => $("fileLibrary").click());
+function showLoading(msg) {
+  $("loadingText").textContent = msg || "処理中…";
+  $("loadingOverlay").classList.remove("hidden");
+}
+function hideLoading() { $("loadingOverlay").classList.add("hidden"); }
+let toastTimer = null;
+function showToast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.remove("hidden");
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add("hidden"), 1800);
+}
+
+/* ================= 画像の取り込み ================= */
+/* 画像をデコードし、長辺 MAX_IMPORT_DIM 以下に縮小して返す */
+async function decodeImage(blob) {
+  let source = null, w = 0, h = 0, bmp = null;
+  if (window.createImageBitmap) {
+    try { bmp = await createImageBitmap(blob, { imageOrientation: "from-image" }); }
+    catch (e) { bmp = null; }
+  }
+  if (bmp) { source = bmp; w = bmp.width; h = bmp.height; }
+  else {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    await new Promise((res, rej) => {
+      img.onload = res;
+      img.onerror = () => rej(new Error("画像を読み込めませんでした"));
+      img.src = url;
+    });
+    source = img; w = img.naturalWidth; h = img.naturalHeight;
+  }
+  const dims = downscaleDims(w, h, MAX_IMPORT_DIM);
+  if (dims.w === w && dims.h === h) return { src: source, w, h };
+  const c = document.createElement("canvas");
+  c.width = dims.w; c.height = dims.h;
+  c.getContext("2d").drawImage(source, 0, 0, dims.w, dims.h);
+  if (bmp && bmp.close) bmp.close();
+  return { src: c, w: dims.w, h: dims.h };
+}
+
+/* 1枚取り込んでページに追加する (編集画面は開かない) */
+async function importBlob(blob) {
+  const d = await decodeImage(blob);
+  const page = {
+    id: ++pageSeq, img: d.src, w: d.w, h: d.h, rotation: 0,
+    corners: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }],
+    filter: "enhance", ocr: ""
+  };
+  pages.push(page);
+  activePageId = page.id;
+  renderPageList();
+  return page;
+}
+
+async function addFiles(fileList) {
+  const files = Array.from(fileList || []).filter(f => f.type && f.type.indexOf("image/") === 0);
+  if (!files.length) return;
+  showLoading("写真を読み込み中…");
+  let last = null, failed = 0;
+  try {
+    for (const f of files) {
+      try { last = await importBlob(f); } catch (e) { failed++; }
+    }
+  } finally { hideLoading(); }
+  if (last) openEditor(last.id);
+  else if (failed) alert("写真を読み込めませんでした");
+}
 $("fileCamera").addEventListener("change", e => { addFiles(e.target.files); e.target.value = ""; });
 $("fileLibrary").addEventListener("change", e => { addFiles(e.target.files); e.target.value = ""; });
-
-function addFiles(fileList) {
-  Array.from(fileList || []).forEach(file => {
-    if (!file.type || file.type.indexOf("image/") !== 0) return;
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const page = {
-        id: ++pageSeq, img, rotation: 0,
-        corners: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }],
-        filter: "enhance", ocr: ""
-      };
-      pages.push(page);
-      activePageId = page.id;
-      renderPageList();
-      openEditor(page.id);
-    };
-    img.src = url;
-  });
-}
+$("btnLibrary").addEventListener("click", () => $("fileLibrary").click());
 
 function getPage(id) { return pages.find(p => p.id === id) || null; }
 
@@ -308,12 +556,12 @@ function rotatedCanvas(page) {
   const rot = ((page.rotation % 360) + 360) % 360;
   const swap = rot === 90 || rot === 270;
   const c = document.createElement("canvas");
-  c.width = swap ? img.naturalHeight : img.naturalWidth;
-  c.height = swap ? img.naturalWidth : img.naturalHeight;
+  c.width = swap ? page.h : page.w;
+  c.height = swap ? page.w : page.h;
   const ctx = c.getContext("2d");
   ctx.translate(c.width / 2, c.height / 2);
   ctx.rotate(rot * Math.PI / 180);
-  ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+  ctx.drawImage(img, -page.w / 2, -page.h / 2);
   return c;
 }
 
@@ -335,9 +583,16 @@ function applyFilter(canvas, filter) {
   ctx.putImageData(im, 0, 0);
 }
 
-/* ページの最終画像 (回転→台形補正→フィルタ) を canvas で返す */
-function renderPage(page) {
-  const base = rotatedCanvas(page);
+/* ページの最終画像 (回転→台形補正→フィルタ) を canvas で返す。maxDim を渡すとその範囲で軽く描く */
+function renderPage(page, maxDim) {
+  let base = rotatedCanvas(page);
+  if (maxDim && Math.max(base.width, base.height) > maxDim) {
+    const dims = downscaleDims(base.width, base.height, maxDim);
+    const small = document.createElement("canvas");
+    small.width = dims.w; small.height = dims.h;
+    small.getContext("2d").drawImage(base, 0, 0, dims.w, dims.h);
+    base = small;
+  }
   const W = base.width, H = base.height;
   const cornersPx = page.corners.map(p => ({ x: p.x * W, y: p.y * H }));
   const full = cornersPx.every((p, i) =>
@@ -373,7 +628,7 @@ function renderPage(page) {
 }
 
 function pageThumbURL(page) {
-  const c = renderPage(page);
+  const c = renderPage(page, 360);
   const t = document.createElement("canvas");
   const scale = 172 / c.width;
   t.width = 172; t.height = Math.max(2, Math.round(c.height * scale));
@@ -415,12 +670,19 @@ function openEditor(id) {
   const page = getPage(id);
   if (!page) return;
   editorPage = page;
-  $("editorCard").classList.remove("hidden");
-  $("editorTitle").textContent = (pages.indexOf(page) + 1) + "ページ目";
-  const base = rotatedCanvas(page);
-  $("editorImg").src = base.toDataURL("image/jpeg", 0.85);
-  updateFilterSeg();
-  requestAnimationFrame(positionHandles);
+  showLoading("ページを準備中…");
+  setTimeout(() => {
+    try {
+      $("editorCard").classList.remove("hidden");
+      $("editorTitle").textContent = (pages.indexOf(page) + 1) + "ページ目";
+      const base = rotatedCanvas(page);
+      $("editorImg").src = base.toDataURL("image/jpeg", 0.82);
+      updateFilterSeg();
+      requestAnimationFrame(positionHandles);
+    } catch (e) {
+      alert("ページを表示できませんでした");
+    } finally { hideLoading(); }
+  }, 30);
 }
 function updateFilterSeg() {
   document.querySelectorAll("#filterSeg button").forEach(b => {
@@ -473,7 +735,10 @@ document.querySelectorAll(".handle").forEach(h => {
   h.addEventListener("pointerup", () => { dragCorner = null; renderPageList(); });
   h.addEventListener("pointercancel", () => { dragCorner = null; });
 });
-window.addEventListener("resize", positionHandles);
+window.addEventListener("resize", () => {
+  positionHandles();
+  if (camStream) layoutGuide();
+});
 $("btnRotate").addEventListener("click", () => {
   if (!editorPage) return;
   editorPage.rotation = (editorPage.rotation + 90) % 360;
@@ -498,6 +763,171 @@ $("btnCloseEditor").addEventListener("click", () => {
   editorPage = null;
   renderPageList();
 });
+
+/* ================= アプリ内カメラ ================= */
+let camStream = null;
+let camAuto = false;
+let camFailed = false;      // アプリ内カメラが使えなかったら、次回からは通常カメラを直接開く
+let camTimer = null;
+let camPrevGray = null;
+let camStableCount = 0;
+let camBusy = false;
+let camSessionPages = 0;
+let camGuide = null;        // ガイド枠 (画面ピクセル)
+let camLastStatus = null;
+
+$("btnCamera").addEventListener("click", () => {
+  if (camFailed) { $("fileCamera").click(); return; }
+  openCamera();
+});
+$("btnCamClose").addEventListener("click", closeCamera);
+$("btnShutter").addEventListener("click", () => captureFromCamera());
+$("btnAutoToggle").addEventListener("click", () => {
+  camAuto = !camAuto;
+  camStableCount = 0; camPrevGray = null;
+  const b = $("btnAutoToggle");
+  b.textContent = camAuto ? "自動撮影：ON" : "自動撮影：OFF";
+  b.classList.toggle("on", camAuto);
+  setCamStatus(camAuto ? "書類を枠に合わせてください" : "");
+});
+
+async function openCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    camFailed = true;
+    alert("この環境ではアプリ内カメラが使えないため、通常のカメラを開きます");
+    $("fileCamera").click();
+    return;
+  }
+  let stream = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1920 } },
+      audio: false
+    });
+  } catch (e) {
+    camFailed = true;
+    alert("カメラを起動できませんでした（許可が必要です）。通常のカメラを開きます");
+    $("fileCamera").click();
+    return;
+  }
+  camStream = stream;
+  camSessionPages = 0;
+  camPrevGray = null; camStableCount = 0; camBusy = false;
+  $("camVideo").srcObject = stream;
+  $("cameraOverlay").classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+  layoutGuide();
+  updateCamCount();
+  try { await $("camVideo").play(); } catch (e) { /* ignore */ }
+  startAutoLoop();
+}
+function closeCamera() {
+  stopAutoLoop();
+  if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+  $("camVideo").srcObject = null;
+  $("cameraOverlay").classList.add("hidden");
+  document.body.style.overflow = "";
+  setCamStatus("");
+  if (camSessionPages > 0 && pages.length) {
+    const last = pages[pages.length - 1];
+    activePageId = last.id;
+    renderPageList();
+    openEditor(last.id);
+  }
+}
+function layoutGuide() {
+  const ow = window.innerWidth, oh = window.innerHeight;
+  const g = guideRectFor(ow, oh);
+  camGuide = g;
+  const guide = $("camGuide");
+  guide.style.left = g.x + "px"; guide.style.top = g.y + "px";
+  guide.style.width = g.w + "px"; guide.style.height = g.h + "px";
+  const st = $("shadeTop"), sb = $("shadeBottom"), sl = $("shadeLeft"), sr = $("shadeRight");
+  st.style.left = "0"; st.style.top = "0"; st.style.width = ow + "px"; st.style.height = g.y + "px";
+  sb.style.left = "0"; sb.style.top = (g.y + g.h) + "px"; sb.style.width = ow + "px"; sb.style.height = (oh - g.y - g.h) + "px";
+  sl.style.left = "0"; sl.style.top = g.y + "px"; sl.style.width = g.x + "px"; sl.style.height = g.h + "px";
+  sr.style.left = (g.x + g.w) + "px"; sr.style.top = g.y + "px"; sr.style.width = (ow - g.x - g.w) + "px"; sr.style.height = g.h + "px";
+}
+function updateCamCount() {
+  const el = $("camCount");
+  el.textContent = "ページ合計 " + pages.length + "枚";
+  el.classList.toggle("hidden", pages.length === 0);
+}
+function setCamStatus(s) {
+  if (s === camLastStatus) return;
+  camLastStatus = s;
+  $("camStatus").textContent = s;
+}
+function startAutoLoop() {
+  stopAutoLoop();
+  camTimer = setInterval(autoTick, 200);
+}
+function stopAutoLoop() {
+  if (camTimer) { clearInterval(camTimer); camTimer = null; }
+}
+function autoTick() {
+  if (!camAuto || camBusy || !camGuide) return;
+  const v = $("camVideo");
+  if (!v.videoWidth) return;
+  const ow = window.innerWidth, oh = window.innerHeight;
+  const crop = videoCropRect(v.videoWidth, v.videoHeight, ow, oh);
+  const sw = 120, sh = Math.max(2, Math.round(sw * oh / ow));
+  const sc = $("camSample");
+  sc.width = sw; sc.height = sh;
+  const sctx = sc.getContext("2d");
+  sctx.drawImage(v, crop.x, crop.y, crop.w, crop.h, 0, 0, sw, sh);
+  let data;
+  try { data = sctx.getImageData(0, 0, sw, sh).data; } catch (e) { return; }
+  const gray = new Float32Array(sw * sh);
+  for (let i = 0; i < sw * sh; i++) {
+    gray[i] = data[i * 4] * 0.299 + data[i * 4 + 1] * 0.587 + data[i * 4 + 2] * 0.114;
+  }
+  const rect = {
+    x: camGuide.x / ow * sw, y: camGuide.y / oh * sh,
+    w: camGuide.w / ow * sw, h: camGuide.h / oh * sh
+  };
+  const stats = analyzeSample(gray, sw, sh, rect);
+  const diff = meanAbsDiff(gray, camPrevGray);
+  camPrevGray = gray;
+  const present = (stats.insideMean - stats.outsideMean > 10) || stats.edgeRatio > 0.035;
+  const stable = diff < 2.0;
+  if (present && stable) camStableCount++; else camStableCount = 0;
+  if (!present) setCamStatus("書類を枠に合わせてください");
+  else if (!stable) setCamStatus("そのまま動かさないでください…");
+  else setCamStatus("撮影します…");
+  if (camStableCount >= 5) {
+    camStableCount = 0;
+    captureFromCamera();
+  }
+}
+async function captureFromCamera() {
+  if (camBusy) return;
+  const v = $("camVideo");
+  if (!v.videoWidth) return;
+  camBusy = true;
+  const flash = $("camFlash");
+  flash.classList.remove("hidden");
+  setTimeout(() => flash.classList.add("hidden"), 130);
+  try {
+    const dims = downscaleDims(v.videoWidth, v.videoHeight, 2400);
+    const c = document.createElement("canvas");
+    c.width = dims.w; c.height = dims.h;
+    c.getContext("2d").drawImage(v, 0, 0, dims.w, dims.h);
+    const blob = await canvasBlob(c, "image/jpeg", 0.92);
+    if (!blob) throw new Error("撮影に失敗しました");
+    await importBlob(blob);
+    camSessionPages++;
+    updateCamCount();
+    showToast("ページを追加しました（" + pages.length + "枚）");
+  } catch (e) {
+    alert("撮影に失敗しました：" + (e && e.message ? e.message : e));
+  } finally {
+    camBusy = false;
+    camPrevGray = null;
+    camStableCount = 0;
+  }
+}
+
 /* ================= OCR ================= */
 let ocrWorker = null;
 async function getOcrWorker() {
@@ -615,13 +1045,16 @@ async function doAction(action) {
       return;
     }
     if (!pages.length) { alert("先にページを追加してください"); return; }
-    if (action === "share-image") {
-      await shareFiles(await buildImageFiles());
-    } else if (action === "share-pdf") {
-      await shareFiles([await buildPdfFile()]);
-    } else if (action === "ask-claude") {
-      await shareFiles(await buildImageFiles(), "この書類を読み取って、全文をテキスト化してください。");
-    }
+    showLoading("準備中…");
+    try {
+      if (action === "share-image") {
+        await shareFiles(await buildImageFiles());
+      } else if (action === "share-pdf") {
+        await shareFiles([await buildPdfFile()]);
+      } else if (action === "ask-claude") {
+        await shareFiles(await buildImageFiles(), "この書類を読み取って、全文をテキスト化してください。");
+      }
+    } finally { hideLoading(); }
   } catch (err) {
     if (err && err.name === "AbortError") return; // 共有シートを閉じただけ
     alert("失敗しました：" + (err && err.message ? err.message : err));
@@ -634,7 +1067,7 @@ $("btnAskClaude").addEventListener("click", () => doAction("ask-claude"));
 /* ================= お気に入り ================= */
 const ACTION_LABEL = {
   "share-pdf": "PDFで共有", "share-image": "画像で共有",
-  "copy-text": "テキストをコピー", "share-text": "テキストを共有",
+  "copy-text": "テキストコピー", "share-text": "テキスト共有",
   "ask-claude": "Museに送る"
 };
 function renderFavorites() {
@@ -699,6 +1132,182 @@ $("btnAddFav").addEventListener("click", () => {
   saveFavorites(); renderFavorites();
   alert("お気に入りに追加しました");
 });
+
+/* ================= 保存タブ (IndexedDB) ================= */
+function idbOpen() {
+  return new Promise((res, rej) => {
+    const rq = indexedDB.open("scanocr-db", 1);
+    rq.onupgradeneeded = () => {
+      rq.result.createObjectStore("scans", { keyPath: "id", autoIncrement: true });
+    };
+    rq.onsuccess = () => res(rq.result);
+    rq.onerror = () => rej(rq.error || new Error("保存領域を開けませんでした"));
+  });
+}
+async function idbAll() {
+  const db = await idbOpen();
+  return new Promise((res, rej) => {
+    const out = [];
+    const rq = db.transaction("scans", "readonly").objectStore("scans").openCursor(null, "prev");
+    rq.onsuccess = () => {
+      const cur = rq.result;
+      if (cur) { out.push(cur.value); cur.continue(); } else res(out);
+    };
+    rq.onerror = () => rej(rq.error);
+  });
+}
+async function idbAdd(rec) {
+  const db = await idbOpen();
+  return new Promise((res, rej) => {
+    const rq = db.transaction("scans", "readwrite").objectStore("scans").add(rec);
+    rq.onsuccess = () => res(rq.result);
+    rq.onerror = () => rej(rq.error || new Error("保存できませんでした"));
+  });
+}
+async function idbDelete(id) {
+  const db = await idbOpen();
+  return new Promise((res, rej) => {
+    const rq = db.transaction("scans", "readwrite").objectStore("scans").delete(id);
+    rq.onsuccess = () => res();
+    rq.onerror = () => rej(rq.error);
+  });
+}
+/* ページを保存用データ (JPEGのバイト列＋編集情報) に変換する */
+async function pageToStored(page) {
+  const c = document.createElement("canvas");
+  c.width = page.w; c.height = page.h;
+  c.getContext("2d").drawImage(page.img, 0, 0);
+  const blob = await canvasBlob(c, "image/jpeg", 0.85);
+  if (!blob) throw new Error("画像の変換に失敗しました");
+  const buf = await blob.arrayBuffer();
+  return {
+    buf, w: page.w, h: page.h, rotation: page.rotation,
+    corners: page.corners.map(p => ({ x: p.x, y: p.y })),
+    filter: page.filter, ocr: page.ocr || ""
+  };
+}
+async function storedToPage(sp) {
+  const blob = new Blob([sp.buf], { type: "image/jpeg" });
+  const d = await decodeImage(blob);
+  return {
+    id: ++pageSeq, img: d.src, w: d.w, h: d.h,
+    rotation: sp.rotation || 0,
+    corners: (sp.corners || []).map(p => ({ x: p.x, y: p.y })),
+    filter: sp.filter || "enhance", ocr: sp.ocr || ""
+  };
+}
+function defaultScanName() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, "0");
+  return "スキャン " + d.getFullYear() + "/" + p(d.getMonth() + 1) + "/" + p(d.getDate()) +
+    " " + p(d.getHours()) + ":" + p(d.getMinutes());
+}
+function formatDateTime(ts) {
+  const d = new Date(ts);
+  const p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "/" + p(d.getMonth() + 1) + "/" + p(d.getDate()) +
+    " " + p(d.getHours()) + ":" + p(d.getMinutes());
+}
+$("btnSaveScan").addEventListener("click", async () => {
+  if (!pages.length) { alert("先にページを追加してください"); return; }
+  const name = prompt("保存名", defaultScanName());
+  if (name === null) return;
+  showLoading("保存中…");
+  try {
+    const stored = [];
+    for (const pg of pages) stored.push(await pageToStored(pg));
+    await idbAdd({ name: name.trim() || defaultScanName(), createdAt: Date.now(), pages: stored });
+    showToast("保存しました");
+    renderLibrary();
+  } catch (e) {
+    alert("保存できませんでした：" + (e && e.message ? e.message : e));
+  } finally { hideLoading(); }
+});
+
+/* 一覧のサムネイル (先頭ページを小さく描く)。作ったものは使い回す */
+const libThumbCache = new Map();
+async function libThumbURL(rec) {
+  if (libThumbCache.has(rec.id)) return libThumbCache.get(rec.id);
+  const page = await storedToPage(rec.pages[0]);
+  const url = pageThumbURL(page);
+  libThumbCache.set(rec.id, url);
+  return url;
+}
+async function renderLibrary() {
+  const list = $("libList");
+  let recs = [];
+  try { recs = await idbAll(); }
+  catch (e) { $("libEmpty").textContent = "保存したスキャンを読み込めませんでした。"; return; }
+  $("libCount").textContent = recs.length ? recs.length + "件" : "";
+  $("libEmpty").style.display = recs.length ? "none" : "";
+  list.innerHTML = "";
+  recs.forEach(rec => {
+    const div = document.createElement("div");
+    div.className = "lib-item";
+    const im = document.createElement("img");
+    im.alt = rec.name;
+    libThumbURL(rec).then(url => { im.src = url; }).catch(() => { /* ignore */ });
+    const info = document.createElement("div");
+    info.className = "info";
+    const nm = document.createElement("div");
+    nm.className = "name"; nm.textContent = rec.name;
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = formatDateTime(rec.createdAt) + " ・ " + rec.pages.length + "ページ";
+    info.appendChild(nm); info.appendChild(meta);
+    const acts = document.createElement("div");
+    acts.className = "acts";
+    const openBtn = document.createElement("button");
+    openBtn.className = "small primary"; openBtn.textContent = "開く";
+    openBtn.addEventListener("click", () => openSavedScan(rec));
+    const delBtn = document.createElement("button");
+    delBtn.className = "small danger"; delBtn.textContent = "削除";
+    delBtn.addEventListener("click", async () => {
+      if (!confirm("「" + rec.name + "」を削除しますか？")) return;
+      try {
+        await idbDelete(rec.id);
+        libThumbCache.delete(rec.id);
+        renderLibrary();
+      } catch (e) { alert("削除できませんでした"); }
+    });
+    acts.appendChild(openBtn); acts.appendChild(delBtn);
+    div.appendChild(im); div.appendChild(info); div.appendChild(acts);
+    list.appendChild(div);
+  });
+}
+async function openSavedScan(rec) {
+  if (pages.length) {
+    if (!confirm("今のページを閉じて、保存したスキャンを開きますか？\n（保存していないページは消えます）")) return;
+  }
+  showLoading("開いています…");
+  try {
+    const loaded = [];
+    for (const sp of rec.pages) loaded.push(await storedToPage(sp));
+    pages = loaded;
+    editorPage = null;
+    $("editorCard").classList.add("hidden");
+    activePageId = pages.length ? pages[0].id : null;
+    const texts = pages.map(p => p.ocr).filter(t => t);
+    $("ocrText").value = texts.join("\n\n----- 次のページ -----\n\n");
+    switchTab("scan");
+    renderPageList();
+    showToast("「" + rec.name + "」を開きました");
+  } catch (e) {
+    alert("開けませんでした：" + (e && e.message ? e.message : e));
+  } finally { hideLoading(); }
+}
+
+/* ================= タブ切り替え ================= */
+function switchTab(which) {
+  const scan = which === "scan";
+  $("viewScan").classList.toggle("hidden", !scan);
+  $("viewLib").classList.toggle("hidden", scan);
+  $("tabScan").classList.toggle("selected", scan);
+  $("tabLib").classList.toggle("selected", !scan);
+  if (!scan) renderLibrary();
+}
+$("tabScan").addEventListener("click", () => switchTab("scan"));
+$("tabLib").addEventListener("click", () => switchTab("lib"));
 
 /* ================= 初期化 ================= */
 if ("serviceWorker" in navigator) {
