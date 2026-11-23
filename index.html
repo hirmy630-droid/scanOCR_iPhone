@@ -55,7 +55,13 @@
   button.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
   .muted { color: var(--muted); font-size: 14px; }
   .pages { display: flex; gap: 8px; flex-wrap: wrap; }
-  .page-thumb { width: 86px; text-align: center; }
+  .page-thumb { width: 86px; text-align: center; position: relative; }
+  .thumb-del {
+    position: absolute; top: 2px; right: 2px; z-index: 2;
+    width: 26px; height: 26px; border-radius: 50%; padding: 0;
+    font-size: 15px; line-height: 1; color: var(--danger);
+    background: var(--card); opacity: .92;
+  }
   .page-thumb img {
     width: 86px; height: 110px; object-fit: cover; border-radius: 8px;
     border: 2px solid var(--border2); background: var(--thumb-bg);
@@ -234,12 +240,12 @@
 </div>
 
 <div class="card" id="pagesCard">
-  <h2>ページ <span class="muted" id="pageCount"></span></h2>
+  <h2 style="display:flex; align-items:center; gap:8px;">ページ <span class="muted" id="pageCount"></span><span style="flex:1;"></span><button id="btnClearAll" class="small danger" title="全部消す" aria-label="全部消す">🗑</button></h2>
   <div class="pages" id="pageList"></div>
   <p class="muted" id="noPages">まだページがありません。</p>
   <div class="row" style="margin-top:10px;">
     <button id="btnSaveScan" class="primary">💾 保存</button>
-    <button id="btnClearAll" class="danger">全部消す</button>
+    <button id="btnSaveNamed">名前をつけて保存</button>
   </div>
 </div>
 
@@ -361,7 +367,7 @@
   <div class="modal-card">
     <h2>使い方 <span class="sp"></span><button class="small" id="btnHelpClose">閉じる</button></h2>
     <p class="muted" style="line-height:1.55;">
-      1. 下の「スキャン」で撮影します。白い枠に書類全体を合わせてください。「自動撮影」をオンにすると、書類を検出して手が止まったら自動で撮ります。手動は下の白い丸ボタンです。続けて撮ると複数ページになります。<br>
+      1. 下の「スキャン」で撮影します。白い枠に書類全体を合わせてください。青い線が書類の縁に吸着したら、検出できた合図です。「自動撮影」をオンにすると、書類を検出して手が止まったら自動で撮ります。手動は下の白い丸ボタンです。続けて撮ると複数ページになります。<br>
       2. 撮影が終わると編集画面になります。ページを選んで青い丸を書類の四隅に合わせると台形補正されます。「強調」にすると文字が読みやすくなります。<br>
       3. 「保存」を押すと一覧に残ります。あとから直すときは、一覧でファイルをタップすると編集画面になります。<br>
       4. 「全ページOCR」でテキスト化できます。印刷文字向けです。手書きや読みにくい書類は「Museに送る」が確実です。PDFで共有すると、OCRした文字が透明なテキストとして入り、GoodNotesなどで文字を選択・検索できます（未OCRのときは共有時に自動で読み取ります）。<br>
@@ -380,6 +386,9 @@
   <div id="camGuide">
     <span class="gc tl"></span><span class="gc tr"></span><span class="gc bl"></span><span class="gc br"></span>
   </div>
+  <svg id="camSnap" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none;">
+    <polygon id="camSnapPoly" points="" fill="rgba(0,122,255,.14)" stroke="#0a84ff" stroke-width="3" style="display:none;"></polygon>
+  </svg>
   <div class="cam-topbar">
     <button id="btnCamClose" class="cam-btn">✕ 閉じる</button>
     <button id="btnAutoToggle" class="cam-btn">自動撮影：OFF</button>
@@ -936,7 +945,12 @@ function renderPageList() {
     const cap = document.createElement("div");
     cap.className = "cap";
     cap.textContent = (idx + 1) + "ページ目";
-    div.appendChild(im); div.appendChild(cap);
+    const del = document.createElement("button");
+    del.className = "thumb-del";
+    del.textContent = "×";
+    del.setAttribute("aria-label", (idx + 1) + "ページ目を削除");
+    del.addEventListener("click", ev => { ev.stopPropagation(); deletePage(page.id); });
+    div.appendChild(im); div.appendChild(cap); div.appendChild(del);
     div.addEventListener("click", () => { activePageId = page.id; renderPageList(); openEditor(page.id); });
     list.appendChild(div);
   });
@@ -962,6 +976,8 @@ function openEditor(id) {
       $("editorCard").classList.remove("hidden");
       $("editorTitle").textContent = (pages.indexOf(page) + 1) + "ページ目";
       const base = rotatedCanvas(page);
+      /* 画像の読み込みが終わってから隅を置く (先に置くと大きさが取れず上に固まる) */
+      $("editorImg").onload = () => positionHandles();
       $("editorImg").src = base.toDataURL("image/jpeg", 0.82);
       updateFilterSeg();
       requestAnimationFrame(positionHandles);
@@ -1076,14 +1092,20 @@ $("btnResetCorners").addEventListener("click", () => {
   editorPage.corners = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }];
   positionHandles(); renderPageList();
 });
+/* ページを1枚消す (サムネイルの×と編集画面の削除で共用) */
+function deletePage(id) {
+  editDirty = true;
+  pages = pages.filter(p => p.id !== id);
+  if (editorPage && editorPage.id === id) {
+    editorPage = null;
+    $("editorCard").classList.add("hidden");
+  }
+  if (activePageId === id) activePageId = pages.length ? pages[0].id : null;
+  renderPageList();
+}
 $("btnDeletePage").addEventListener("click", () => {
   if (!editorPage) return;
-  editDirty = true;
-  pages = pages.filter(p => p.id !== editorPage.id);
-  editorPage = null;
-  activePageId = pages.length ? pages[0].id : null;
-  $("editorCard").classList.add("hidden");
-  renderPageList();
+  deletePage(editorPage.id);
 });
 $("btnCloseEditor").addEventListener("click", () => {
   $("editorCard").classList.add("hidden");
@@ -1105,6 +1127,8 @@ let camBusy = false;
 let camSessionPages = 0;
 let camGuide = null;        // ガイド枠 (画面ピクセル)
 let camLastStatus = null;
+let camSnapQuad = null;     // 吸着した書類の隅 (画面に対する割合)
+let camSnapMiss = 0;
 
 /* シャッター音 (WebAudio で短いクリックを2回合成する。外部ファイル不要) */
 let shutterCtx = null;
@@ -1227,6 +1251,7 @@ async function openCamera(silent) {
   camStream = stream;
   camSessionPages = 0;
   camPrevGray = null; camStableCount = 0; camPresentCount = 0; camBusy = false; camAutoArmed = true;
+  camSnapQuad = null; camSnapMiss = 0; $("camSnapPoly").style.display = "none";
   $("camVideo").srcObject = stream;
   $("cameraOverlay").classList.remove("hidden");
   document.body.style.overflow = "hidden";
@@ -1241,6 +1266,7 @@ function closeCamera() {
   if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
   $("camVideo").srcObject = null;
   $("cameraOverlay").classList.add("hidden");
+  camSnapQuad = null; camSnapMiss = 0; $("camSnapPoly").style.display = "none";
   document.body.style.overflow = "";
   setCamStatus("");
   if (pages.length) {
@@ -1285,8 +1311,38 @@ function startAutoLoop() {
 function stopAutoLoop() {
   if (camTimer) { clearInterval(camTimer); camTimer = null; }
 }
+/* 撮影画面のサンプルから書類の隅を検出し、青いラインを吸着表示する (自動撮影OFFでも動く) */
+function updateSnap(gray, sw, sh, rect) {
+  const guideFrac = [
+    { x: rect.x / sw, y: rect.y / sh },
+    { x: (rect.x + rect.w) / sw, y: rect.y / sh },
+    { x: (rect.x + rect.w) / sw, y: (rect.y + rect.h) / sh },
+    { x: rect.x / sw, y: (rect.y + rect.h) / sh }
+  ];
+  let det = null;
+  try { det = detectDocCorners(gray, sw, sh, camSnapQuad || guideFrac, camSnapQuad ? 0.12 : 0.25); }
+  catch (e) { det = null; }
+  const poly = $("camSnapPoly");
+  if (det) {
+    if (camSnapQuad) {
+      /* 急に飛ばないよう、前の位置からなめらかに寄せる */
+      det = det.map((p, i) => ({
+        x: camSnapQuad[i].x + (p.x - camSnapQuad[i].x) * 0.55,
+        y: camSnapQuad[i].y + (p.y - camSnapQuad[i].y) * 0.55
+      }));
+    }
+    camSnapQuad = det;
+    camSnapMiss = 0;
+    poly.setAttribute("points", det.map(p =>
+      (p.x * window.innerWidth) + "," + (p.y * window.innerHeight)).join(" "));
+    poly.style.display = "";
+  } else if (++camSnapMiss >= 4) {
+    camSnapQuad = null;
+    poly.style.display = "none";
+  }
+}
 function autoTick() {
-  if (!camAuto || camBusy || !camGuide) return;
+  if (camBusy || !camGuide) return;
   const v = $("camVideo");
   if (!v.videoWidth) return;
   const ow = window.innerWidth, oh = window.innerHeight;
@@ -1306,6 +1362,8 @@ function autoTick() {
     x: camGuide.x / ow * sw, y: camGuide.y / oh * sh,
     w: camGuide.w / ow * sw, h: camGuide.h / oh * sh
   };
+  updateSnap(gray, sw, sh, rect);
+  if (!camAuto) { camPrevGray = gray; return; }
   const stats = analyzeSample(gray, sw, sh, rect);
   const diff = meanAbsDiff(gray, camPrevGray);
   camPrevGray = gray;
@@ -1354,7 +1412,16 @@ async function captureFromCamera() {
       corners = guide;
       try {
         const g = grayFromDrawable(c, c.width, c.height);
-        const det = detectDocCorners(g.gray, g.w, g.h, guide, 0.10);
+        /* 吸着中の隅があれば、それを手がかりに撮影画像でも検出する */
+        let prior = guide;
+        if (camSnapQuad) {
+          const crop = videoCropRect(v.videoWidth, v.videoHeight, window.innerWidth, window.innerHeight);
+          prior = camSnapQuad.map(p => ({
+            x: (crop.x + p.x * crop.w) / v.videoWidth,
+            y: (crop.y + p.y * crop.h) / v.videoHeight
+          }));
+        }
+        const det = detectDocCorners(g.gray, g.w, g.h, prior, 0.10);
         if (det) corners = det;
       } catch (e) { /* ガイド枠のまま */ }
     }
@@ -1886,14 +1953,15 @@ function formatDate(ts) {
   const p = n => String(n).padStart(2, "0");
   return d.getFullYear() + "/" + p(d.getMonth() + 1) + "/" + p(d.getDate());
 }
-$("btnSaveScan").addEventListener("click", async () => {
+/* 保存する。askName=false は名前を聞かずに (新規は日付の名前で) 保存する */
+async function saveScan(askName) {
   if (!pages.length) { alert("ページがありません"); return; }
   syncOcrTextToPages();
-  let name = editingName;
-  if (editingId === null) {
-    name = prompt("保存名", defaultScanName());
-    if (name === null) return;
-    name = (name || "").trim() || defaultScanName();
+  let name = editingId !== null ? editingName : defaultScanName();
+  if (askName) {
+    const input = prompt("保存名", name);
+    if (input === null) return;
+    name = (input || "").trim() || name;
   }
   showLoading("保存中…");
   try {
@@ -1902,10 +1970,10 @@ $("btnSaveScan").addEventListener("click", async () => {
     if (editingId === null) {
       editingCreatedAt = Date.now();
       editingId = await idbAdd({ name, createdAt: editingCreatedAt, pages: stored });
-      editingName = name;
     } else {
-      await idbPut({ id: editingId, name: editingName, createdAt: editingCreatedAt, pages: stored });
+      await idbPut({ id: editingId, name, createdAt: editingCreatedAt, pages: stored });
     }
+    editingName = name;
     editDirty = false;
     libThumbCache.delete(editingId);   // 一覧のサムネイルを作り直す
     showToast("保存しました");
@@ -1918,7 +1986,9 @@ $("btnSaveScan").addEventListener("click", async () => {
     const def = favorites.find(f => f.id === defaultFavId);
     if (def) { try { await doAction(def.action); } catch (e) { /* doAction内で通知済み */ } }
   }
-});
+}
+$("btnSaveScan").addEventListener("click", () => saveScan(false));
+$("btnSaveNamed").addEventListener("click", () => saveScan(true));
 
 /* 一覧のサムネイル (先頭ページを小さく描く)。作ったものは使い回す */
 const libThumbCache = new Map();
