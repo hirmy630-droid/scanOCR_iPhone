@@ -1106,7 +1106,36 @@ let camSessionPages = 0;
 let camGuide = null;        // ガイド枠 (画面ピクセル)
 let camLastStatus = null;
 
+/* シャッター音 (WebAudio で短いクリックを2回合成する。外部ファイル不要) */
+let shutterCtx = null;
+function initShutterSound() {
+  try {
+    if (!shutterCtx) shutterCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (shutterCtx.state === "suspended") shutterCtx.resume();
+  } catch (e) { /* 音が出なくても撮影は続ける */ }
+}
+function playShutter() {
+  if (!shutterCtx) return;
+  try {
+    if (shutterCtx.state === "suspended") shutterCtx.resume();
+    const t0 = shutterCtx.currentTime;
+    [0, 0.07].forEach(off => {
+      const dur = 0.03;
+      const buf = shutterCtx.createBuffer(1, Math.ceil(shutterCtx.sampleRate * dur), shutterCtx.sampleRate);
+      const ch = buf.getChannelData(0);
+      for (let i = 0; i < ch.length; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / ch.length);
+      const src = shutterCtx.createBufferSource(); src.buffer = buf;
+      const g = shutterCtx.createGain();
+      g.gain.setValueAtTime(0.5, t0 + off);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + off + dur);
+      src.connect(g); g.connect(shutterCtx.destination);
+      src.start(t0 + off);
+    });
+  } catch (e) { /* ignore */ }
+}
+
 $("btnCamera").addEventListener("click", () => {
+  initShutterSound();
   startNewScan();
   if (camFailed) { $("fileCamera").click(); return; }
   openCamera();
@@ -1307,6 +1336,7 @@ async function captureFromCamera() {
   const v = $("camVideo");
   if (!v.videoWidth) return;
   camBusy = true;
+  playShutter();
   const flash = $("camFlash");
   flash.classList.remove("hidden");
   setTimeout(() => flash.classList.add("hidden"), 130);
@@ -1764,6 +1794,7 @@ $("btnBackList").addEventListener("click", () => {
   showHome();
 });
 $("btnAddCamera").addEventListener("click", () => {
+  initShutterSound();
   if (camFailed) { $("fileCamera").click(); return; }
   openCamera();
 });
