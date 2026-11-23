@@ -31,7 +31,7 @@
   body {
     font-family: -apple-system, "Hiragino Kaku Gothic ProN", sans-serif;
     background: var(--bg); color: var(--text); font-size: 16px; line-height: 1.4;
-    padding: env(safe-area-inset-top) 10px calc(env(safe-area-inset-bottom) + 12px);
+    padding: env(safe-area-inset-top) 10px calc(env(safe-area-inset-bottom) + 84px);
   }
   h1 { font-size: 20px; margin: 8px 2px 6px; }
   h2 { font-size: 16px; margin: 0 0 6px; }
@@ -183,26 +183,54 @@
     padding: 6px 10px; border-radius: 999px;
   }
   #camFlash { position: absolute; inset: 0; background: #fff; opacity: .85; }
+
+  /* ヘッダー・下部固定バー・ポップアップ */
+  .app-header { display: flex; align-items: center; gap: 6px; }
+  .app-header h1 { flex: 1; min-width: 0; }
+  .icon-btn { flex: 0 0 auto; width: 44px; padding: 8px 0; font-size: 18px; }
+  #actionBar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    display: flex; gap: 8px; padding: 8px 10px calc(env(safe-area-inset-bottom) + 8px);
+    background: var(--card); border-top: 1px solid var(--border2);
+    box-shadow: 0 -2px 10px rgba(0,0,0,.08);
+  }
+  #actionBar button { flex: 1; }
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.45);
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .modal-card {
+    background: var(--card); color: var(--text); width: 100%; max-height: 88dvh;
+    overflow-y: auto; border-radius: 16px 16px 0 0;
+    padding: 14px 12px calc(env(safe-area-inset-bottom) + 14px);
+  }
+  .modal-card h2 { display: flex; align-items: center; gap: 8px; }
+  .modal-card h2 .sp { flex: 1; }
+  .set-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .set-label { flex: 1; font-size: 14px; }
+  .set-seg { flex: 0 0 128px; }
+  .lib-item { cursor: pointer; }
 </style>
 </head>
 <body>
 
-<h1>📄 スキャンOCR</h1>
-
-<div class="tabs">
-  <button id="tabScan" class="selected">📷 スキャン</button>
-  <button id="tabLib">💾 保存</button>
+<div class="app-header">
+  <h1>📄 スキャンOCR</h1>
+  <button class="icon-btn" id="btnFavOpen" aria-label="お気に入り設定">⭐</button>
+  <button class="icon-btn" id="btnHelpOpen" aria-label="使い方">❓</button>
 </div>
 
-<div id="viewScan">
+<div id="viewEdit" class="hidden">
+<input type="file" id="fileCamera" accept="image/*" capture="environment" class="hidden">
+<input type="file" id="fileLibrary" accept="image/*" class="hidden">
+
 <div class="card">
   <div class="row">
-    <button class="primary big" id="btnCamera">📷 撮影する</button>
-    <button class="big" id="btnLibrary">🖼 写真から選ぶ</button>
+    <button id="btnBackList">← 一覧</button>
+    <button id="btnAddCamera">＋撮影</button>
+    <button id="btnAddLibrary">＋写真</button>
   </div>
-  <input type="file" id="fileCamera" accept="image/*" capture="environment" class="hidden">
-  <input type="file" id="fileLibrary" accept="image/*" class="hidden">
-  <p class="muted" style="margin:6px 0 0;">撮るとページ一覧に追加されます。選ぶと切り抜き（台形補正）ができます。</p>
+  <p class="muted" id="editName" style="margin:6px 0 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">新規スキャン</p>
 </div>
 
 <div class="card" id="pagesCard">
@@ -210,10 +238,9 @@
   <div class="pages" id="pageList"></div>
   <p class="muted" id="noPages">まだページがありません。</p>
   <div class="row" style="margin-top:10px;">
-    <button id="btnSaveScan" class="primary">💾 スキャン保存</button>
+    <button id="btnSaveScan" class="primary">💾 保存</button>
     <button id="btnClearAll" class="danger">全部消す</button>
   </div>
-  <p class="muted" style="margin:6px 0 0;">保存したスキャンは「保存」タブに残ります。</p>
 </div>
 
 <div class="card hidden" id="editorCard">
@@ -272,47 +299,65 @@
   </div>
   <p class="muted" style="margin:6px 0 0;">共有シートから写真・ファイル・GoodNotesなどへ渡せます。「Museに送る」は読み取り依頼つきです。</p>
 </div>
-</div><!-- /viewScan -->
+</div><!-- /viewEdit -->
 
-<div id="viewLib" class="hidden">
+<div id="viewHome">
   <div class="card">
     <h2>保存したスキャン <span class="muted" id="libCount"></span></h2>
     <div id="libList"></div>
-    <p class="muted" id="libEmpty">保存したスキャンはまだありません。「スキャン」タブで撮って、「このスキャンを保存」を押すとここに残ります。</p>
+    <p class="muted" id="libEmpty">まだ保存がありません。下の「スキャン」で撮って、編集画面で「保存」を押すとここに残ります。</p>
     <p class="muted" style="margin:6px 0 0;">保存先はiPhone内です。空き容量が極端に少ないとiOSが消すことがあります。大事なものはPDFや画像でも残してください。</p>
   </div>
 </div>
 
-<details class="card">
-  <summary>⭐ お気に入りの設定</summary>
-  <div id="favList" style="margin-top:6px;"></div>
-  <h2 style="margin-top:14px;">お気に入りを追加</h2>
-  <input type="text" id="favName" placeholder="名前（例：PDFでGoodNotes）">
-  <select id="favAction" style="margin-top:8px;">
-    <option value="share-pdf">PDFで共有</option>
-    <option value="share-image">画像で共有</option>
-    <option value="copy-text">テキストコピー</option>
-    <option value="share-text">テキスト共有</option>
-    <option value="ask-claude">Museに送る</option>
-  </select>
-  <div class="row" style="margin-top:8px;">
-    <button id="btnAddFav" class="primary">追加する</button>
-  </div>
-  <p class="muted">「デフォルト」にしたお気に入りは、保存・共有の先頭に大きく出ます。各お気に入りの「実行」でもそのまま使えます。</p>
-</details>
+<div id="actionBar">
+  <button class="primary big" id="btnCamera">📷 スキャン</button>
+  <button class="big" id="btnLibrary">🖼 写真から</button>
+</div>
 
-<details class="card">
-  <summary>使い方</summary>
-  <p class="muted" style="line-height:1.55;">
-    1. 「撮影する」でカメラが開きます。白い枠に書類全体を合わせてください。「自動撮影」をオンにすると、書類を検出して手ぶれが収まったら自動で撮ります。手動は下の白い丸ボタンです。続けて撮ると複数ページになります。「閉じる」で戻ると、最後のページの編集画面になります。<br>
-    2. ページを選んで、青い丸を書類の四隅に合わせると台形補正されます。「強調」にすると文字が読みやすくなります。<br>
-    3. 「全ページをOCR」でテキスト化できます。印刷文字向けです。<br>
-    4. 保存・共有から、画像／PDF／テキストで渡せます。よく使う渡し方は「お気に入り」に登録しておくと、選ぶだけで実行できます。<br>
-    5. 手書きや読みにくい書類は「Museに送る」が確実です。<br>
-    6. 「このスキャンを保存」を押すと、アプリ内の「保存」タブに残せます。保存したスキャンは後から開いて、編集・OCR・共有ができます。<br>
-    ※カメラが開かない環境では、通常のカメラ（写真の確認画面）に切り替わります。画面の色は iPhone のライト／ダーク設定に自動で合います。
-  </p>
-</details>
+<div id="favModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h2>⭐ お気に入り設定 <span class="sp"></span><button class="small" id="btnFavClose">閉じる</button></h2>
+    <div id="favList" style="margin-top:6px;"></div>
+    <h2 style="margin-top:14px;">お気に入りを追加</h2>
+    <input type="text" id="favName" placeholder="名前（例：PDFでGoodNotes）">
+    <select id="favAction" style="margin-top:8px;">
+      <option value="share-pdf">PDFで共有</option>
+      <option value="share-image">画像で共有</option>
+      <option value="copy-text">テキストコピー</option>
+      <option value="share-text">テキスト共有</option>
+      <option value="ask-claude">Museに送る</option>
+    </select>
+    <div class="row" style="margin-top:8px;">
+      <button id="btnAddFav" class="primary">追加する</button>
+    </div>
+    <p class="muted">「デフォルト」にしたお気に入りは、保存・共有の先頭に大きく出ます。</p>
+    <h2 style="margin-top:14px;">設定</h2>
+    <div class="set-row">
+      <span class="set-label">保存後にデフォルトを実行</span>
+      <div class="seg set-seg" id="segDefaultRun"><button data-v="on">ON</button><button data-v="off">OFF</button></div>
+    </div>
+    <div class="set-row">
+      <span class="set-label">起動時にカメラを開く</span>
+      <div class="seg set-seg" id="segLaunchCam"><button data-v="on">ON</button><button data-v="off">OFF</button></div>
+    </div>
+    <p class="muted" style="margin:6px 0 0;">「保存後にデフォルトを実行」がONだと、保存した直後にデフォルトのお気に入りが自動で動きます。</p>
+  </div>
+</div>
+
+<div id="helpModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h2>使い方 <span class="sp"></span><button class="small" id="btnHelpClose">閉じる</button></h2>
+    <p class="muted" style="line-height:1.55;">
+      1. 下の「スキャン」で撮影します。白い枠に書類全体を合わせてください。「自動撮影」をオンにすると、書類を検出して手が止まったら自動で撮ります。手動は下の白い丸ボタンです。続けて撮ると複数ページになります。<br>
+      2. 撮影が終わると編集画面になります。ページを選んで青い丸を書類の四隅に合わせると台形補正されます。「強調」にすると文字が読みやすくなります。<br>
+      3. 「保存」を押すと一覧に残ります。あとから直すときは、一覧でファイルをタップすると編集画面になります。<br>
+      4. 「全ページOCR」でテキスト化できます。印刷文字向けです。手書きや読みにくい書類は「Museに送る」が確実です。<br>
+      5. ⭐（タイトル右）でお気に入りと設定が開きます。保存した直後にデフォルトのお気に入りを自動で動かす設定もあります。<br>
+      ※カメラが開かない環境では、通常のカメラ（写真の確認画面）に切り替わります。画面の色は iPhone のライト／ダーク設定に自動で合います。
+    </p>
+  </div>
+</div>
 
 <div id="cameraOverlay" class="hidden">
   <video id="camVideo" autoplay playsinline muted></video>
@@ -375,6 +420,28 @@ function loadFavorites() {
 }
 function saveFavorites() {
   try { localStorage.setItem(LS_FAV, JSON.stringify({ items: favorites, defaultId: defaultFavId })); } catch (e) { /* ignore */ }
+}
+
+/* ================= 設定 (ON/OFF) ================= */
+const LS_SETTINGS = "scanocr.settings.v1";
+let settings = { runDefaultOnSave: true, launchCamera: false };
+try {
+  const rawS = localStorage.getItem(LS_SETTINGS);
+  if (rawS) {
+    const d = JSON.parse(rawS);
+    if (typeof d.runDefaultOnSave === "boolean") settings.runDefaultOnSave = d.runDefaultOnSave;
+    if (typeof d.launchCamera === "boolean") settings.launchCamera = d.launchCamera;
+  }
+} catch (e) { /* ignore */ }
+function saveSettings() {
+  try { localStorage.setItem(LS_SETTINGS, JSON.stringify(settings)); } catch (e) { /* ignore */ }
+}
+function paintSettings() {
+  [["segDefaultRun", settings.runDefaultOnSave], ["segLaunchCam", settings.launchCamera]].forEach(([id, on]) => {
+    document.querySelectorAll("#" + id + " button").forEach(b => {
+      b.classList.toggle("selected", (b.dataset.v === "on") === on);
+    });
+  });
 }
 
 function stamp() {
@@ -541,12 +608,12 @@ async function addFiles(fileList) {
       try { last = await importBlob(f); } catch (e) { failed++; }
     }
   } finally { hideLoading(); }
-  if (last) openEditor(last.id);
+  if (last) { editDirty = true; showEdit(); openEditor(last.id); }
   else if (failed) alert("写真を読み込めませんでした");
 }
 $("fileCamera").addEventListener("change", e => { addFiles(e.target.files); e.target.value = ""; });
 $("fileLibrary").addEventListener("change", e => { addFiles(e.target.files); e.target.value = ""; });
-$("btnLibrary").addEventListener("click", () => $("fileLibrary").click());
+$("btnLibrary").addEventListener("click", () => { startNewScan(); $("fileLibrary").click(); });
 
 function getPage(id) { return pages.find(p => p.id === id) || null; }
 
@@ -659,6 +726,7 @@ function renderPageList() {
 $("btnClearAll").addEventListener("click", () => {
   if (!pages.length) return;
   if (!confirm("全ページを消しますか？")) return;
+  editDirty = true;
   pages = []; activePageId = null;
   $("editorCard").classList.add("hidden");
   renderPageList();
@@ -693,6 +761,7 @@ document.querySelectorAll("#filterSeg button").forEach(b => {
   b.addEventListener("click", () => {
     if (!editorPage) return;
     editorPage.filter = b.dataset.filter;
+    editDirty = true;
     updateFilterSeg(); renderPageList();
   });
 });
@@ -732,7 +801,7 @@ document.querySelectorAll(".handle").forEach(h => {
     editorPage.corners[dragCorner] = { x, y };
     positionHandles();
   });
-  h.addEventListener("pointerup", () => { dragCorner = null; renderPageList(); });
+  h.addEventListener("pointerup", () => { if (dragCorner !== null) editDirty = true; dragCorner = null; renderPageList(); });
   h.addEventListener("pointercancel", () => { dragCorner = null; });
 });
 window.addEventListener("resize", () => {
@@ -741,17 +810,20 @@ window.addEventListener("resize", () => {
 });
 $("btnRotate").addEventListener("click", () => {
   if (!editorPage) return;
+  editDirty = true;
   editorPage.rotation = (editorPage.rotation + 90) % 360;
   editorPage.corners = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }];
   openEditor(editorPage.id); renderPageList();
 });
 $("btnResetCorners").addEventListener("click", () => {
   if (!editorPage) return;
+  editDirty = true;
   editorPage.corners = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }];
   positionHandles(); renderPageList();
 });
 $("btnDeletePage").addEventListener("click", () => {
   if (!editorPage) return;
+  editDirty = true;
   pages = pages.filter(p => p.id !== editorPage.id);
   editorPage = null;
   activePageId = pages.length ? pages[0].id : null;
@@ -777,6 +849,7 @@ let camGuide = null;        // ガイド枠 (画面ピクセル)
 let camLastStatus = null;
 
 $("btnCamera").addEventListener("click", () => {
+  startNewScan();
   if (camFailed) { $("fileCamera").click(); return; }
   openCamera();
 });
@@ -791,11 +864,13 @@ $("btnAutoToggle").addEventListener("click", () => {
   setCamStatus(camAuto ? "書類を枠に合わせてください" : "");
 });
 
-async function openCamera() {
+async function openCamera(silent) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    camFailed = true;
-    alert("この環境ではアプリ内カメラが使えないため、通常のカメラを開きます");
-    $("fileCamera").click();
+    if (!silent) {
+      camFailed = true;
+      alert("この環境ではアプリ内カメラが使えないため、通常のカメラを開きます");
+      $("fileCamera").click();
+    }
     return;
   }
   let stream = null;
@@ -805,9 +880,11 @@ async function openCamera() {
       audio: false
     });
   } catch (e) {
-    camFailed = true;
-    alert("カメラを起動できませんでした（許可が必要です）。通常のカメラを開きます");
-    $("fileCamera").click();
+    if (!silent) {
+      camFailed = true;
+      alert("カメラを起動できませんでした（許可が必要です）。通常のカメラを開きます");
+      $("fileCamera").click();
+    }
     return;
   }
   camStream = stream;
@@ -828,11 +905,16 @@ function closeCamera() {
   $("cameraOverlay").classList.add("hidden");
   document.body.style.overflow = "";
   setCamStatus("");
-  if (camSessionPages > 0 && pages.length) {
-    const last = pages[pages.length - 1];
-    activePageId = last.id;
-    renderPageList();
-    openEditor(last.id);
+  if (pages.length) {
+    showEdit();
+    if (camSessionPages > 0) {
+      const last = pages[pages.length - 1];
+      activePageId = last.id;
+      renderPageList();
+      openEditor(last.id);
+    }
+  } else {
+    showHome();
   }
 }
 function layoutGuide() {
@@ -889,13 +971,13 @@ function autoTick() {
   const stats = analyzeSample(gray, sw, sh, rect);
   const diff = meanAbsDiff(gray, camPrevGray);
   camPrevGray = gray;
-  const present = (stats.insideMean - stats.outsideMean > 10) || stats.edgeRatio > 0.035;
-  const stable = diff < 2.0;
+  const present = (stats.insideMean - stats.outsideMean > 6) || stats.edgeRatio > 0.022;
+  const stable = diff < 5.0;
   if (present && stable) camStableCount++; else camStableCount = 0;
   if (!present) setCamStatus("書類を枠に合わせてください");
   else if (!stable) setCamStatus("そのまま動かさないでください…");
   else setCamStatus("撮影します…");
-  if (camStableCount >= 5) {
+  if (camStableCount >= 4) {
     camStableCount = 0;
     captureFromCamera();
   }
@@ -916,6 +998,7 @@ async function captureFromCamera() {
     const blob = await canvasBlob(c, "image/jpeg", 0.92);
     if (!blob) throw new Error("撮影に失敗しました");
     await importBlob(blob);
+    editDirty = true;
     camSessionPages++;
     updateCamCount();
     showToast("ページを追加しました（" + pages.length + "枚）");
@@ -961,6 +1044,7 @@ async function runOcr(targetPages) {
       $("ocrStatus").textContent = (i + 1) + " / " + targetPages.length + " ページ目を処理中…";
       const text = await ocrPage(targetPages[i]);
       targetPages[i].ocr = text;
+      editDirty = true;
       parts.push(text);
     }
     $("ocrText").value = parts.filter(t => t).join("\n\n----- 次のページ -----\n\n");
@@ -1092,7 +1176,7 @@ function renderFavorites() {
     row.appendChild(b);
   });
   if (favorites.length) btnWrap.appendChild(row);
-  else btnWrap.innerHTML = '<p class="muted">お気に入りはまだありません。下の設定から追加できます。</p>';
+  else btnWrap.innerHTML = '<p class="muted">お気に入りはまだありません。右上の⭐から追加できます。</p>';
 
   const list = $("favList");
   list.innerHTML = "";
@@ -1133,7 +1217,45 @@ $("btnAddFav").addEventListener("click", () => {
   alert("お気に入りに追加しました");
 });
 
-/* ================= 保存タブ (IndexedDB) ================= */
+/* ================= 画面切り替え・編集セッション ================= */
+let editingId = null;        // 保存済みを開いているときのID。新規は null
+let editingName = "";
+let editingCreatedAt = 0;
+let editDirty = false;
+function showHome() {
+  editorPage = null;
+  $("editorCard").classList.add("hidden");
+  $("viewEdit").classList.add("hidden");
+  $("viewHome").classList.remove("hidden");
+  $("actionBar").classList.remove("hidden");
+  renderLibrary();
+}
+function showEdit() {
+  $("viewHome").classList.add("hidden");
+  $("actionBar").classList.add("hidden");
+  $("viewEdit").classList.remove("hidden");
+  $("editName").textContent = editingName || "新規スキャン";
+  renderPageList();
+}
+function startNewScan() {
+  pages = []; activePageId = null; editorPage = null;
+  $("editorCard").classList.add("hidden");
+  $("ocrText").value = "";
+  editingId = null; editingName = ""; editingCreatedAt = 0; editDirty = false;
+}
+$("btnBackList").addEventListener("click", () => {
+  if (editDirty && pages.length) {
+    if (!confirm("保存せずに一覧へ戻りますか？\n（今の変更は消えます）")) return;
+  }
+  showHome();
+});
+$("btnAddCamera").addEventListener("click", () => {
+  if (camFailed) { $("fileCamera").click(); return; }
+  openCamera();
+});
+$("btnAddLibrary").addEventListener("click", () => $("fileLibrary").click());
+
+/* ================= 保存 (IndexedDB) ================= */
 function idbOpen() {
   return new Promise((res, rej) => {
     const rq = indexedDB.open("scanocr-db", 1);
@@ -1161,6 +1283,14 @@ async function idbAdd(rec) {
   return new Promise((res, rej) => {
     const rq = db.transaction("scans", "readwrite").objectStore("scans").add(rec);
     rq.onsuccess = () => res(rq.result);
+    rq.onerror = () => rej(rq.error || new Error("保存できませんでした"));
+  });
+}
+async function idbPut(rec) {
+  const db = await idbOpen();
+  return new Promise((res, rej) => {
+    const rq = db.transaction("scans", "readwrite").objectStore("scans").put(rec);
+    rq.onsuccess = () => res();
     rq.onerror = () => rej(rq.error || new Error("保存できませんでした"));
   });
 }
@@ -1209,19 +1339,35 @@ function formatDateTime(ts) {
     " " + p(d.getHours()) + ":" + p(d.getMinutes());
 }
 $("btnSaveScan").addEventListener("click", async () => {
-  if (!pages.length) { alert("先にページを追加してください"); return; }
-  const name = prompt("保存名", defaultScanName());
-  if (name === null) return;
+  if (!pages.length) { alert("ページがありません"); return; }
+  let name = editingName;
+  if (editingId === null) {
+    name = prompt("保存名", defaultScanName());
+    if (name === null) return;
+    name = (name || "").trim() || defaultScanName();
+  }
   showLoading("保存中…");
   try {
     const stored = [];
     for (const pg of pages) stored.push(await pageToStored(pg));
-    await idbAdd({ name: name.trim() || defaultScanName(), createdAt: Date.now(), pages: stored });
+    if (editingId === null) {
+      editingCreatedAt = Date.now();
+      editingId = await idbAdd({ name, createdAt: editingCreatedAt, pages: stored });
+      editingName = name;
+    } else {
+      await idbPut({ id: editingId, name: editingName, createdAt: editingCreatedAt, pages: stored });
+    }
+    editDirty = false;
     showToast("保存しました");
-    renderLibrary();
   } catch (e) {
     alert("保存できませんでした：" + (e && e.message ? e.message : e));
+    return;
   } finally { hideLoading(); }
+  showHome();
+  if (settings.runDefaultOnSave) {
+    const def = favorites.find(f => f.id === defaultFavId);
+    if (def) { try { await doAction(def.action); } catch (e) { /* doAction内で通知済み */ } }
+  }
 });
 
 /* 一覧のサムネイル (先頭ページを小さく描く)。作ったものは使い回す */
@@ -1257,12 +1403,10 @@ async function renderLibrary() {
     info.appendChild(nm); info.appendChild(meta);
     const acts = document.createElement("div");
     acts.className = "acts";
-    const openBtn = document.createElement("button");
-    openBtn.className = "small primary"; openBtn.textContent = "開く";
-    openBtn.addEventListener("click", () => openSavedScan(rec));
     const delBtn = document.createElement("button");
     delBtn.className = "small danger"; delBtn.textContent = "削除";
-    delBtn.addEventListener("click", async () => {
+    delBtn.addEventListener("click", async ev => {
+      ev.stopPropagation();
       if (!confirm("「" + rec.name + "」を削除しますか？")) return;
       try {
         await idbDelete(rec.id);
@@ -1270,15 +1414,13 @@ async function renderLibrary() {
         renderLibrary();
       } catch (e) { alert("削除できませんでした"); }
     });
-    acts.appendChild(openBtn); acts.appendChild(delBtn);
+    acts.appendChild(delBtn);
     div.appendChild(im); div.appendChild(info); div.appendChild(acts);
+    div.addEventListener("click", () => openSavedScan(rec));
     list.appendChild(div);
   });
 }
 async function openSavedScan(rec) {
-  if (pages.length) {
-    if (!confirm("今のページを閉じて、保存したスキャンを開きますか？\n（保存していないページは消えます）")) return;
-  }
   showLoading("開いています…");
   try {
     const loaded = [];
@@ -1287,27 +1429,29 @@ async function openSavedScan(rec) {
     editorPage = null;
     $("editorCard").classList.add("hidden");
     activePageId = pages.length ? pages[0].id : null;
+    editingId = rec.id; editingName = rec.name; editingCreatedAt = rec.createdAt; editDirty = false;
     const texts = pages.map(p => p.ocr).filter(t => t);
     $("ocrText").value = texts.join("\n\n----- 次のページ -----\n\n");
-    switchTab("scan");
-    renderPageList();
+    showEdit();
     showToast("「" + rec.name + "」を開きました");
   } catch (e) {
     alert("開けませんでした：" + (e && e.message ? e.message : e));
   } finally { hideLoading(); }
 }
 
-/* ================= タブ切り替え ================= */
-function switchTab(which) {
-  const scan = which === "scan";
-  $("viewScan").classList.toggle("hidden", !scan);
-  $("viewLib").classList.toggle("hidden", scan);
-  $("tabScan").classList.toggle("selected", scan);
-  $("tabLib").classList.toggle("selected", !scan);
-  if (!scan) renderLibrary();
-}
-$("tabScan").addEventListener("click", () => switchTab("scan"));
-$("tabLib").addEventListener("click", () => switchTab("lib"));
+/* ================= ポップアップ・設定の操作 ================= */
+$("btnFavOpen").addEventListener("click", () => { paintSettings(); $("favModal").classList.remove("hidden"); });
+$("btnFavClose").addEventListener("click", () => $("favModal").classList.add("hidden"));
+$("favModal").addEventListener("click", e => { if (e.target === $("favModal")) $("favModal").classList.add("hidden"); });
+$("btnHelpOpen").addEventListener("click", () => $("helpModal").classList.remove("hidden"));
+$("btnHelpClose").addEventListener("click", () => $("helpModal").classList.add("hidden"));
+$("helpModal").addEventListener("click", e => { if (e.target === $("helpModal")) $("helpModal").classList.add("hidden"); });
+document.querySelectorAll("#segDefaultRun button").forEach(b => {
+  b.addEventListener("click", () => { settings.runDefaultOnSave = b.dataset.v === "on"; saveSettings(); paintSettings(); });
+});
+document.querySelectorAll("#segLaunchCam button").forEach(b => {
+  b.addEventListener("click", () => { settings.launchCamera = b.dataset.v === "on"; saveSettings(); paintSettings(); });
+});
 
 /* ================= 初期化 ================= */
 if ("serviceWorker" in navigator) {
@@ -1317,6 +1461,11 @@ if ("serviceWorker" in navigator) {
 }
 renderPageList();
 renderFavorites();
+renderLibrary();
+paintSettings();
+if (settings.launchCamera) {
+  setTimeout(() => { startNewScan(); openCamera(true); }, 500);
+}
 </script>
 </body>
 </html>
