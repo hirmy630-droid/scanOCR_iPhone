@@ -999,16 +999,22 @@ function openEditor(id) {
     try {
       $("editorCard").classList.remove("hidden");
       $("editorTitle").textContent = (pages.indexOf(page) + 1) + "ページ目";
-      const base = rotatedCanvas(page);
-      /* 画像の読み込みが終わってから隅を置く (先に置くと大きさが取れず上に固まる) */
-      $("editorImg").onload = () => positionHandles();
-      $("editorImg").src = base.toDataURL("image/jpeg", 0.82);
+      refreshEditorPreview();
       updateFilterSeg();
       requestAnimationFrame(positionHandles);
     } catch (e) {
       alert("ページを表示できませんでした");
     } finally { hideLoading(); }
   }, 30);
+}
+/* 編集画面のプレビュー (回転後の画像にフィルタを効かせて表示する。
+   画像の読み込みが終わってから隅を置く (先に置くと大きさが取れず上に固まる) */
+function refreshEditorPreview() {
+  if (!editorPage) return;
+  const base = rotatedCanvas(editorPage);
+  applyFilter(base, editorPage.filter);
+  $("editorImg").onload = () => positionHandles();
+  $("editorImg").src = base.toDataURL("image/jpeg", 0.82);
 }
 function updateFilterSeg() {
   document.querySelectorAll("#filterSeg button").forEach(b => {
@@ -1020,7 +1026,7 @@ document.querySelectorAll("#filterSeg button").forEach(b => {
     if (!editorPage) return;
     editorPage.filter = b.dataset.filter;
     editDirty = true;
-    updateFilterSeg(); renderPageList();
+    updateFilterSeg(); renderPageList(); refreshEditorPreview();
   });
 });
 function handlePos(i) {
