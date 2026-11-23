@@ -295,6 +295,9 @@
     <button id="btnSharePdf">PDFで共有</button>
   </div>
   <div class="row" style="margin-top:8px;">
+    <button id="btnDriveUpload">☁️ Driveへアップロード</button>
+  </div>
+  <div class="row" style="margin-top:8px;">
     <button id="btnAskClaude" class="primary">🤖 Museに送る（読み取りを頼む）</button>
   </div>
   <p class="muted" style="margin:6px 0 0;">共有シートから写真・ファイル・GoodNotesなどへ渡せます。「Museに送る」は読み取り依頼つきです。</p>
@@ -327,6 +330,7 @@
       <option value="copy-text">テキストコピー</option>
       <option value="share-text">テキスト共有</option>
       <option value="ask-claude">Museに送る</option>
+      <option value="drive-upload">Driveへアップロード</option>
     </select>
     <div class="row" style="margin-top:8px;">
       <button id="btnAddFav" class="primary">追加する</button>
@@ -342,6 +346,14 @@
       <div class="seg set-seg" id="segLaunchCam"><button data-v="on">ON</button><button data-v="off">OFF</button></div>
     </div>
     <p class="muted" style="margin:6px 0 0;">「保存後にデフォルトを実行」がONだと、保存した直後にデフォルトのお気に入りが自動で動きます。</p>
+    <h2 style="margin-top:14px;">Driveアップロード</h2>
+    <input type="text" id="driveUrl" placeholder="アップロードURL（https://script.google.com/…）">
+    <input type="text" id="driveKey" placeholder="合言葉" style="margin-top:8px;">
+    <div class="row" style="margin-top:8px;">
+      <button id="btnDriveSave">URLと合言葉を保存</button>
+      <button id="btnDriveTest">テスト送信</button>
+    </div>
+    <p class="muted" style="margin:6px 0 0;">送信先は Drive の「スキャンOCR」フォルダです（PDFで上がります）。</p>
   </div>
 </div>
 
@@ -424,13 +436,15 @@ function saveFavorites() {
 
 /* ================= 設定 (ON/OFF) ================= */
 const LS_SETTINGS = "scanocr.settings.v1";
-let settings = { runDefaultOnSave: true, launchCamera: false };
+let settings = { runDefaultOnSave: true, launchCamera: false, driveUrl: "", driveKey: "" };
 try {
   const rawS = localStorage.getItem(LS_SETTINGS);
   if (rawS) {
     const d = JSON.parse(rawS);
     if (typeof d.runDefaultOnSave === "boolean") settings.runDefaultOnSave = d.runDefaultOnSave;
     if (typeof d.launchCamera === "boolean") settings.launchCamera = d.launchCamera;
+    if (typeof d.driveUrl === "string") settings.driveUrl = d.driveUrl;
+    if (typeof d.driveKey === "string") settings.driveKey = d.driveKey;
   }
 } catch (e) { /* ignore */ }
 function saveSettings() {
@@ -1130,6 +1144,7 @@ async function doAction(action) {
     }
     if (!pages.length) { alert("先にページを追加してください"); return; }
     showLoading("準備中…");
+    let doneMsg = "";
     try {
       if (action === "share-image") {
         await shareFiles(await buildImageFiles());
@@ -1137,8 +1152,13 @@ async function doAction(action) {
         await shareFiles([await buildPdfFile()]);
       } else if (action === "ask-claude") {
         await shareFiles(await buildImageFiles(), "この書類を読み取って、全文をテキスト化してください。");
+      } else if (action === "drive-upload") {
+        const pdf = await buildPdfFile();
+        await uploadToDrive(pdf, (editingName || ("scan_" + stamp())) + ".pdf", "application/pdf");
+        doneMsg = "Driveへ送信しました。フォルダ「スキャンOCR」に入ります。";
       }
     } finally { hideLoading(); }
+    if (doneMsg) alert(doneMsg);
   } catch (err) {
     if (err && err.name === "AbortError") return; // 共有シートを閉じただけ
     alert("失敗しました：" + (err && err.message ? err.message : err));
@@ -1147,12 +1167,35 @@ async function doAction(action) {
 $("btnShareImage").addEventListener("click", () => doAction("share-image"));
 $("btnSharePdf").addEventListener("click", () => doAction("share-pdf"));
 $("btnAskClaude").addEventListener("click", () => doAction("ask-claude"));
+$("btnDriveUpload").addEventListener("click", () => doAction("drive-upload"));
+
+/* ================= Drive アップロード ================= */
+/* Apps Script の受け口へファイルを送る。応答はブラウザの仕様で読めないため、
+   送信できたら「送信済み」として扱い、実際の確認は Drive 側で行う */
+async function uploadToDrive(blob, name, mimeType) {
+  const url = (settings.driveUrl || "").trim();
+  const key = (settings.driveKey || "").trim();
+  if (!url || !key) throw new Error("⭐の設定でアップロードURLと合言葉を入れてください");
+  const dataUrl = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(new Error("ファイルの読み込みに失敗しました"));
+    r.readAsDataURL(blob);
+  });
+  const b64 = String(dataUrl).split(",")[1] || "";
+  if (!b64) throw new Error("ファイルの変換に失敗しました");
+  await fetch(url, {
+    method: "POST", mode: "no-cors",
+    headers: { "Content-Type": "text/plain;charset=UTF-8" },
+    body: JSON.stringify({ key, name, mimeType, base64: b64 })
+  });
+}
 
 /* ================= お気に入り ================= */
 const ACTION_LABEL = {
   "share-pdf": "PDFで共有", "share-image": "画像で共有",
   "copy-text": "テキストコピー", "share-text": "テキスト共有",
-  "ask-claude": "Museに送る"
+  "ask-claude": "Museに送る", "drive-upload": "Driveへアップロード"
 };
 function renderFavorites() {
   const btnWrap = $("favButtons");
@@ -1440,7 +1483,31 @@ async function openSavedScan(rec) {
 }
 
 /* ================= ポップアップ・設定の操作 ================= */
-$("btnFavOpen").addEventListener("click", () => { paintSettings(); $("favModal").classList.remove("hidden"); });
+$("btnFavOpen").addEventListener("click", () => {
+  paintSettings();
+  $("driveUrl").value = settings.driveUrl || "";
+  $("driveKey").value = settings.driveKey || "";
+  $("favModal").classList.remove("hidden");
+});
+$("btnDriveSave").addEventListener("click", () => {
+  settings.driveUrl = $("driveUrl").value.trim();
+  settings.driveKey = $("driveKey").value.trim();
+  saveSettings();
+  showToast("保存しました");
+});
+$("btnDriveTest").addEventListener("click", async () => {
+  settings.driveUrl = $("driveUrl").value.trim();
+  settings.driveKey = $("driveKey").value.trim();
+  saveSettings();
+  showLoading("テスト送信中…");
+  try {
+    const blob = new Blob(["スキャンOCRのテスト送信です " + new Date().toLocaleString("ja-JP")], { type: "text/plain" });
+    await uploadToDrive(blob, "scanocr-test.txt", "text/plain");
+    alert("テスト送信しました。Driveの「スキャンOCR」フォルダに scanocr-test.txt があれば成功です");
+  } catch (e) {
+    alert("送信できませんでした：" + (e && e.message ? e.message : e));
+  } finally { hideLoading(); }
+});
 $("btnFavClose").addEventListener("click", () => $("favModal").classList.add("hidden"));
 $("favModal").addEventListener("click", e => { if (e.target === $("favModal")) $("favModal").classList.add("hidden"); });
 $("btnHelpOpen").addEventListener("click", () => $("helpModal").classList.remove("hidden"));
