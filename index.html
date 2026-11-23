@@ -53,6 +53,22 @@
   button.danger { color: var(--danger); }
   button:disabled { opacity: .45; }
   button.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
+  /* シルバーのボタン (明るいグレーのグラデーション＋濃い文字。ライト／ダーク共通) */
+  button.btn-silver {
+    background: linear-gradient(180deg, #f4f4f7, #d9d9e0 55%, #c2c2cc);
+    border-color: #a6a6b0; color: #1c1c1e;
+  }
+  /* 保存・共有の中のボタンはダークグレーで、ボタンらしく影と境目をはっきりさせる */
+  #shareCard button {
+    background: linear-gradient(180deg, #5b5b63, #3a3a41);
+    border-color: #2b2b30; color: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.35);
+  }
+  /* ページ枠の中の保存ボタンはオレンジ */
+  #pagesCard .row > button {
+    background: linear-gradient(180deg, #ffab2e, #f08c00);
+    border-color: #d97c00; color: #fff; font-weight: 600;
+  }
   .muted { color: var(--muted); font-size: 14px; }
   .pages { display: flex; gap: 8px; flex-wrap: wrap; }
   .page-thumb { width: 86px; text-align: center; position: relative; }
@@ -110,8 +126,9 @@
 
   /* 保存ライブラリ */
   .lib-item {
-    display: flex; gap: 8px; align-items: center; padding: 6px 0;
-    border-bottom: 1px solid var(--divider);
+    display: flex; gap: 8px; align-items: center; padding: 6px 8px;
+    background: linear-gradient(180deg, #f4f4f7, #dcdce2 55%, #c6c6d0);
+    border-radius: 10px; margin: 6px 0; color: #1c1c1e;
   }
   .lib-item:last-child { border-bottom: none; }
   .lib-item img {
@@ -120,7 +137,7 @@
   }
   .lib-item .info { flex: 1; min-width: 0; }
   .lib-item .name { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .lib-item .meta { font-size: 14px; color: var(--muted); margin-top: 1px; white-space: nowrap; }
+  .lib-item .meta { font-size: 14px; color: #48484a; margin-top: 1px; white-space: nowrap; }
   .lib-item .acts { display: flex; flex-direction: column; gap: 5px; }
 
   /* 処理中オーバーレイ */
@@ -232,9 +249,9 @@
 
 <div class="card">
   <div class="row">
-    <button id="btnBackList">← 一覧</button>
-    <button id="btnAddCamera">＋撮影</button>
-    <button id="btnAddLibrary">＋写真</button>
+    <button id="btnBackList" class="btn-silver">← 一覧</button>
+    <button id="btnAddCamera" class="btn-silver">＋撮影</button>
+    <button id="btnAddLibrary" class="btn-silver">＋写真</button>
   </div>
   <p class="muted" id="editName" style="margin:6px 0 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">新規スキャン</p>
 </div>
@@ -294,7 +311,7 @@
   <p class="muted" style="margin:6px 0 0;">初回のみ、日本語データの取得で時間がかかります。</p>
 </div>
 
-<div class="card">
+<div class="card" id="shareCard">
   <h2>保存・共有</h2>
   <div id="favButtons"></div>
   <div class="row" style="margin-top:8px;">
@@ -307,7 +324,6 @@
   <div class="row" style="margin-top:8px;">
     <button id="btnAskClaude" class="primary">🤖 Museに送る（読み取りを頼む）</button>
   </div>
-  <p class="muted" style="margin:6px 0 0;">共有シートから写真・ファイル・GoodNotesなどへ渡せます。「Museに送る」は読み取り依頼つきです。</p>
 </div>
 </div><!-- /viewEdit -->
 
@@ -363,13 +379,21 @@
   </div>
 </div>
 
+<div id="favPickModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h2>お気に入り <span class="sp"></span><button class="small" id="btnFavPickClose">閉じる</button></h2>
+    <p class="muted" style="margin:6px 0 0;">選ぶと、このファイルに実行します。</p>
+    <div id="favPickList"></div>
+  </div>
+</div>
+
 <div id="helpModal" class="modal-overlay hidden">
   <div class="modal-card">
     <h2>使い方 <span class="sp"></span><button class="small" id="btnHelpClose">閉じる</button></h2>
     <p class="muted" style="line-height:1.55;">
       1. 下の「スキャン」で撮影します。白い枠に書類全体を合わせてください。青い線が書類の縁に吸着したら、検出できた合図です。「自動撮影」をオンにすると、書類を検出して手が止まったら自動で撮ります。手動は下の白い丸ボタンです。続けて撮ると複数ページになります。<br>
       2. 撮影が終わると編集画面になります。ページを選んで青い丸を書類の四隅に合わせると台形補正されます。「強調」にすると文字が読みやすくなります。<br>
-      3. 「保存」を押すと一覧に残ります。あとから直すときは、一覧でファイルをタップすると編集画面になります。<br>
+      3. 「保存」を押すと一覧に残ります。あとから直すときは、一覧でファイルをタップすると編集画面になります。一覧の「お気に入り」ボタンからは、登録したお気に入りをそのファイルに実行できます。<br>
       4. 「全ページOCR」でテキスト化できます。印刷文字向けです。手書きや読みにくい書類は「Museに送る」が確実です。PDFで共有すると、OCRした文字が透明なテキストとして入り、GoodNotesなどで文字を選択・検索できます（未OCRのときは共有時に自動で読み取ります）。<br>
       5. ⚙（タイトル右）でお気に入りと設定が開きます。保存した直後にデフォルトのお気に入りを自動で動かす設定もあります。<br>
       ※カメラが開かない環境では、通常のカメラ（写真の確認画面）に切り替わります。画面の色は iPhone のライト／ダーク設定に自動で合います。
@@ -1779,14 +1803,21 @@ function renderFavorites() {
   const row = document.createElement("div");
   row.className = "row";
   row.style.marginTop = def ? "8px" : "0";
+  row.style.display = "grid";
+  row.style.gridTemplateColumns = "1fr 1fr";
+  let rowCount = 0;
   favorites.forEach(f => {
+    if (def && f.id === def.id) return;   // デフォルトは上の大きなボタンと重複するので並べない
     const b = document.createElement("button");
     b.textContent = f.name;
+    b.style.whiteSpace = "normal";
     b.addEventListener("click", () => doAction(f.action));
     row.appendChild(b);
+    rowCount++;
   });
-  if (favorites.length) btnWrap.appendChild(row);
+  if (favorites.length) { if (rowCount) btnWrap.appendChild(row); }
   else btnWrap.innerHTML = '<p class="muted">お気に入りはまだありません。右上の⚙から追加できます。</p>';
+  syncFixedShareButtons();
 
   const list = $("favList");
   list.innerHTML = "";
@@ -1817,6 +1848,28 @@ function renderFavorites() {
     div.appendChild(del);
     list.appendChild(div);
   });
+}
+/* お気に入りと同じ動作の固定ボタンは隠す (ボタンの重複をなくす)。
+   お気に入りを消せば、固定ボタンが戻る */
+function syncFixedShareButtons() {
+  const acts = new Set(favorites.map(f => f.action));
+  const pairs = [
+    ["btnShareImage", "share-image"], ["btnSharePdf", "share-pdf"],
+    ["btnDriveUpload", "drive-upload"], ["btnAskClaude", "ask-claude"]
+  ];
+  for (const [id, action] of pairs) {
+    const b = $(id);
+    if (b) b.style.display = acts.has(action) ? "none" : "";
+  }
+  const hideRowIfAllHidden = btnIds => {
+    const first = $(btnIds[0]);
+    if (!first || !first.parentElement) return;
+    const allHidden = btnIds.every(id => $(id) && $(id).style.display === "none");
+    first.parentElement.style.display = allHidden ? "none" : "";
+  };
+  hideRowIfAllHidden(["btnShareImage", "btnSharePdf"]);
+  hideRowIfAllHidden(["btnDriveUpload"]);
+  hideRowIfAllHidden(["btnAskClaude"]);
 }
 $("btnAddFav").addEventListener("click", () => {
   const name = $("favName").value.trim();
@@ -1999,6 +2052,89 @@ async function libThumbURL(rec) {
   libThumbCache.set(rec.id, url);
   return url;
 }
+/* ================= 一覧のファイルへのお気に入り実行 ================= */
+let favPickRec = null;
+function renderFavPick() {
+  const wrap = $("favPickList");
+  wrap.innerHTML = "";
+  if (!favorites.length) {
+    wrap.innerHTML = '<p class="muted">お気に入りはまだありません。右上の⚙から追加できます。</p>';
+    return;
+  }
+  favorites.forEach(f => {
+    const b = document.createElement("button");
+    b.style.width = "100%";
+    b.style.marginTop = "8px";
+    b.textContent = f.name + "（" + (ACTION_LABEL[f.action] || f.action) + "）" + (f.id === defaultFavId ? " ★デフォルト" : "");
+    b.addEventListener("click", async () => {
+      $("favPickModal").classList.add("hidden");
+      const rec = favPickRec;
+      favPickRec = null;
+      if (rec) await execFavOnSaved(rec, f.action);
+    });
+    wrap.appendChild(b);
+  });
+}
+$("btnFavPickClose").addEventListener("click", () => {
+  $("favPickModal").classList.add("hidden");
+  favPickRec = null;
+});
+/* OCRの結果を保存レコードへ書き戻す (画像は元の保存データのまま、再圧縮しない) */
+async function persistOcrToRec(rec, loaded) {
+  try {
+    const stored = rec.pages.map((sp, i) => Object.assign({}, sp, {
+      ocr: loaded[i].ocr || "", words: loaded[i].words || null,
+      ocrW: loaded[i].ocrW || 0, ocrH: loaded[i].ocrH || 0, ocrDone: !!loaded[i].ocrDone
+    }));
+    await idbPut({ id: rec.id, name: rec.name, createdAt: rec.createdAt, pages: stored });
+  } catch (e) { /* 保存できなくても実行は続ける */ }
+}
+/* 一覧の保存ファイルにお気に入りの動作を実行する (編集画面の doAction の保存ファイル版) */
+async function execFavOnSaved(rec, action) {
+  try {
+    if (action === "copy-text" || action === "share-text") {
+      const t = rec.pages.map(p => p.ocr || "").filter(s => s.trim()).join(OCR_PAGE_SEP).trim();
+      if (!t) { alert("テキストがありません。先にOCRしてください"); return; }
+      if (action === "copy-text") {
+        await navigator.clipboard.writeText(t);
+        alert("テキストをコピーしました");
+      } else if (navigator.share) {
+        await navigator.share({ text: t });
+      } else {
+        await navigator.clipboard.writeText(t);
+        alert("共有できない環境のため、テキストをコピーしました");
+      }
+      return;
+    }
+    showLoading("準備中…");
+    let doneMsg = "";
+    try {
+      const loaded = [];
+      for (const sp of rec.pages) loaded.push(await storedToPage(sp));
+      if (action === "share-pdf" || action === "drive-upload") {
+        if (await ensureWords(loaded)) await persistOcrToRec(rec, loaded);
+      }
+      if (action === "share-image") {
+        await shareFiles(await buildImageFiles(loaded));
+      } else if (action === "share-pdf") {
+        const pdf = await buildPdfFile(loaded);
+        const safeName = (rec.name || "scan").replace(/[\\\/:*?"<>|]/g, "_");
+        await shareFiles([new File([pdf], safeName + ".pdf", { type: "application/pdf" })]);
+      } else if (action === "ask-claude") {
+        await shareFiles(await buildImageFiles(loaded), "この書類を読み取って、全文をテキスト化してください。");
+      } else if (action === "drive-upload") {
+        const pdf = await buildPdfFile(loaded);
+        await uploadToDrive(pdf, (rec.name || ("scan_" + stamp())) + ".pdf", "application/pdf");
+        doneMsg = "Driveへ送信しました。フォルダ「スキャンOCR」に入ります。";
+      }
+    } finally { hideLoading(); }
+    if (doneMsg) alert(doneMsg);
+  } catch (err) {
+    if (err && err.name === "AbortError") return; // 共有シートを閉じただけ
+    alert("失敗しました：" + (err && err.message ? err.message : err));
+  }
+}
+
 async function renderLibrary() {
   const list = $("libList");
   let recs = [];
@@ -2023,35 +2159,15 @@ async function renderLibrary() {
     info.appendChild(nm); info.appendChild(meta);
     const acts = document.createElement("div");
     acts.className = "acts";
-    const shareBtn = document.createElement("button");
-    shareBtn.className = "small"; shareBtn.textContent = "共有";
-    shareBtn.addEventListener("click", async ev => {
+    const favBtn = document.createElement("button");
+    favBtn.className = "small"; favBtn.textContent = "お気に入り";
+    favBtn.addEventListener("click", ev => {
       ev.stopPropagation();
-      showLoading("PDFを作成中…");
-      try {
-        const loaded = [];
-        for (const sp of rec.pages) loaded.push(await storedToPage(sp));
-        if (await ensureWords(loaded)) {
-          /* 読み取った文字を保存にも残す (次回から速い)。
-             画像は元の保存データをそのまま使い、OCRの結果だけを重ねる (再圧縮しない) */
-          try {
-            const stored = rec.pages.map((sp, i) => Object.assign({}, sp, {
-              ocr: loaded[i].ocr || "", words: loaded[i].words || null,
-              ocrW: loaded[i].ocrW || 0, ocrH: loaded[i].ocrH || 0, ocrDone: !!loaded[i].ocrDone
-            }));
-            await idbPut({ id: rec.id, name: rec.name, createdAt: rec.createdAt, pages: stored });
-          } catch (e) { /* 保存できなくても共有は続ける */ }
-        }
-        const pdf = await buildPdfFile(loaded);
-        const safeName = (rec.name || "scan").replace(/[\\\/:*?"<>|]/g, "_");
-        const named = new File([pdf], safeName + ".pdf", { type: "application/pdf" });
-        await shareFiles([named]);
-      } catch (e) {
-        if (e && e.name === "AbortError") return; // 共有シートを閉じただけ
-        alert("共有できませんでした：" + (e && e.message ? e.message : e));
-      } finally { hideLoading(); }
+      favPickRec = rec;
+      renderFavPick();
+      $("favPickModal").classList.remove("hidden");
     });
-    acts.appendChild(shareBtn);
+    acts.appendChild(favBtn);
     const delBtn = document.createElement("button");
     delBtn.className = "small danger"; delBtn.textContent = "削除";
     delBtn.addEventListener("click", async ev => {
